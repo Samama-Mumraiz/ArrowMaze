@@ -1,0 +1,54 @@
+{
+  "name": "arrow-puzzle",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@expo-google-fonts/sora": "^0.4.2",
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-masked-view/masked-view": "^0.3.2",
+    "@react-navigation/bottom-tabs": "^7.21.0",
+    "@react-navigation/native": "^7.0.14",
+    "@react-navigation/native-stack": "^7.1.14",
+    "@types/react": "~19.3.0",
+    "expo": "^58.0.0",
+    "expo-av": "~16.0.8",
+    "expo-blur": "~58.0.5",
+    "expo-font": "~58.0.10",
+    "expo-haptics": "~58.0.7",
+    "expo-linear-gradient": "~58.0.3",
+    "expo-status-bar": "~58.0.4",
+    "react": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-reanimated": "4.7.1",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-screens": "~4.30.0",
+    "react-native-svg": "15.16.0",
+    "react-native-worklets": "0.13.0",
+    "typescript": "~6.0.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@types/node": "^26.6.5",
+    "babel-preset-expo": "~58.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~58.0.4"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "test": "npx tsx --test src/tests/raycast.test.ts src/tests/levelGenerator.test.ts src/tests/tangledStrands.test.ts src/tests/gamification.test.ts src/tests/arrowSvgGeometry.test.ts src/tests/snakeGeometry.test.ts src/tests/gameplayMechanics.test.ts"
+  },
+  "private": true,
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "expo-av"
+        ]
+      }
+    }
+  }
+}
