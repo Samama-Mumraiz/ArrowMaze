@@ -71,9 +71,22 @@ export default function WinLoseModal({
             pressed && styles.actionButtonPressed,
           ]}
         >
-          <Text style={styles.actionButtonText}>
-            {isWin ? 'NEXT LEVEL →' : 'TRY AGAIN ↺'}
-          </Text>
+          <View style={styles.actionButtonContent}>
+            <Text style={styles.actionButtonText}>
+              {isWin ? 'NEXT LEVEL' : 'TRY AGAIN'}
+            </Text>
+            {isWin && (
+              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M5 12h14M12 5l7 7-7 7"
+                  stroke="#FFFFFF"
+                  strokeWidth={2.4}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            )}
+          </View>
         </Pressable>
       </View>
     </View>
@@ -156,6 +169,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 10,
     elevation: 6,
+  },
+  actionButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   winButton: {
     backgroundColor: '#10b981',

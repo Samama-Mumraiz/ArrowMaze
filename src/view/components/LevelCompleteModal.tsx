@@ -162,7 +162,7 @@ export default function LevelCompleteModal({
 
         {/* 4. BUTTONS STACK: Next Level -> | Home (Screen 6 Reference) */}
         <View style={styles.buttonsContainer}>
-          {/* Primary Button: NEXT LEVEL -> (Electric Blue Gradient Fill) */}
+          {/* Primary Button: Next Level -> (Electric Blue Gradient Fill) */}
           <TouchableOpacity
             activeOpacity={0.88}
             onPress={onNextLevel}
@@ -175,7 +175,18 @@ export default function LevelCompleteModal({
               end={{ x: 1, y: 1 }}
               style={styles.primaryButtonGradient}
             >
-              <Text style={styles.primaryButtonText}>Next Level  →</Text>
+              <View style={styles.primaryButtonContent}>
+                <Text style={styles.primaryButtonText}>Next Level</Text>
+                <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                  <Path
+                    d="M5 12h14M12 5l7 7-7 7"
+                    stroke="#FFFFFF"
+                    strokeWidth={2.4}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+              </View>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -350,6 +361,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 26,
+  },
+  primaryButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   primaryButtonText: {
     fontFamily: 'Sora_600SemiBold',
