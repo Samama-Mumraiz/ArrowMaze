@@ -335,7 +335,7 @@ export default function LevelSelectionScreen(): React.JSX.Element {
 
         {/* Bottom Cybercircuit Bus Traces */}
         <Path
-          d="M100,SCREEN_HEIGHT-80 L180,SCREEN_HEIGHT-80 L210,SCREEN_HEIGHT-110 L320,SCREEN_HEIGHT-110"
+          d={`M100,${SCREEN_HEIGHT - 80} L180,${SCREEN_HEIGHT - 80} L210,${SCREEN_HEIGHT - 110} L320,${SCREEN_HEIGHT - 110}`}
           stroke="rgba(0, 220, 255, 0.25)"
           strokeWidth="1.5"
           fill="none"
