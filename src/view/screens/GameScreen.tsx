@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import FloatingHUD from '../components/FloatingHUD';
 import BoardView from '../components/BoardView';
 import GameplayBottomBar from '../components/GameplayBottomBar';
@@ -17,6 +17,7 @@ import { colors } from '../../theme/colors';
 
 export default function GameScreen(): React.JSX.Element {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { currentLevel, setCurrentLevel, stats, recordWin, recordLoss, useHint } = usePlayer();
   const [isLevelSelectOpen, setIsLevelSelectOpen] = useState<boolean>(false);
 
@@ -46,6 +47,17 @@ export default function GameScreen(): React.JSX.Element {
     retryLevel,
     goToLevel,
   } = useGameController(currentLevel || 1, recordWin, recordLoss);
+
+  React.useEffect(() => {
+    const routeLevel = route.params?.level;
+    if (routeLevel !== undefined && routeLevel !== null) {
+      const parsed = Number(routeLevel);
+      if (!isNaN(parsed) && parsed > 0 && parsed !== levelNumber) {
+        setCurrentLevel(parsed);
+        goToLevel(parsed);
+      }
+    }
+  }, [route.params?.level, levelNumber, setCurrentLevel, goToLevel]);
 
   const handleNextLevel = () => {
     const nextLvl = levelNumber + 1;

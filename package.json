@@ -39,7 +39,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "npx tsx --test src/tests/raycast.test.ts src/tests/levelGenerator.test.ts src/tests/tangledStrands.test.ts src/tests/gamification.test.ts src/tests/arrowSvgGeometry.test.ts src/tests/snakeGeometry.test.ts src/tests/gameplayMechanics.test.ts"
+    "test": "npx tsx --test src/tests/raycast.test.ts src/tests/levelGenerator.test.ts src/tests/tangledStrands.test.ts src/tests/gamification.test.ts src/tests/arrowSvgGeometry.test.ts src/tests/snakeGeometry.test.ts src/tests/gameplayMechanics.test.ts",
+    "postinstall": "node -e \"const fs=require('fs'); if(fs.existsSync('node_modules/expo/tsconfig.base.json') && !fs.existsSync('node_modules/expo/tsconfig.base')) fs.copyFileSync('node_modules/expo/tsconfig.base.json', 'node_modules/expo/tsconfig.base');\""
   },
   "private": true,
   "expo": {

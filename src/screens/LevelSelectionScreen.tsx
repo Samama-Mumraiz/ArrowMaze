@@ -1,274 +1,443 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  ScrollView,
+  Pressable,
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path, Defs, Pattern, Line, Rect } from 'react-native-svg';
+import Svg, {
+  Path,
+  Defs,
+  Pattern,
+  Line,
+  Rect,
+  Circle,
+  Polygon,
+} from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { usePlayer } from '../store/PlayerContext';
-import { colors } from '../theme/colors';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-type LevelRange = '1-25' | '26-50' | '51-75';
+// 12 levels in a 4x3 grid
+const LEVELS_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+// Reanimated pressable component for level buttons
+function AnimatedLevelNode({
+  level,
+  isUnlocked,
+  stars,
+  onPress,
+}: {
+  level: number;
+  isUnlocked: boolean;
+  stars: number;
+  onPress: () => void;
+}): React.JSX.Element {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    if (!isUnlocked) return;
+    scale.value = withTiming(0.92, {
+      duration: 120,
+      easing: Easing.out(Easing.ease),
+    });
+  };
+
+  const handlePressOut = () => {
+    if (!isUnlocked) return;
+    scale.value = withTiming(1, {
+      duration: 180,
+      easing: Easing.out(Easing.ease),
+    });
+  };
+
+  return (
+    <Animated.View style={[styles.nodeWrapper, animatedStyle]}>
+      <Pressable
+        disabled={!isUnlocked}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={[
+          styles.nodePressable,
+          !isUnlocked && styles.nodeLockedPressable,
+        ]}
+      >
+        {/* Outer Glowing Concentric Ring */}
+        <View
+          style={[
+            styles.outerRing,
+            isUnlocked ? styles.outerRingUnlocked : styles.outerRingLocked,
+          ]}
+        >
+          {/* Middle Metallic Ring */}
+          <View
+            style={[
+              styles.middleRing,
+              isUnlocked ? styles.middleRingUnlocked : styles.middleRingLocked,
+            ]}
+          >
+            {/* Inner Center Circle with Gradient */}
+            <LinearGradient
+              colors={
+                isUnlocked
+                  ? ['#0A426F', '#062B4E', '#02182F']
+                  : ['#0B1B30', '#071324', '#040B16']
+              }
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={styles.innerCircle}
+            >
+              {isUnlocked ? (
+                <Text style={styles.levelNumberText}>{level}</Text>
+              ) : (
+                /* Padlock Icon */
+                <Svg width={26} height={28} viewBox="0 0 24 26" fill="none">
+                  {/* Shackle */}
+                  <Path
+                    d="M6 10V6.5C6 3.46 8.69 1 12 1s6 2.46 6 5.5V10"
+                    stroke="#386A94"
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                  />
+                  {/* Lock Body */}
+                  <Rect
+                    x="3"
+                    y="10"
+                    width="18"
+                    height="14"
+                    rx="3.5"
+                    fill="#153655"
+                    stroke="#2D5A80"
+                    strokeWidth="1.5"
+                  />
+                  {/* Keyhole */}
+                  <Circle cx="12" cy="16" r="1.8" fill="#4B88B8" />
+                  <Path
+                    d="M11.2 16.8L10.7 20.5H13.3L12.8 16.8"
+                    fill="#4B88B8"
+                  />
+                </Svg>
+              )}
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* 3 Achievement Stars Below Node */}
+        <View style={styles.starsContainer}>
+          {[1, 2, 3].map((starIndex) => {
+            const isEarned = isUnlocked && stars >= starIndex;
+            return (
+              <View
+                key={starIndex}
+                style={[
+                  styles.starItem,
+                  starIndex === 2 && styles.starCenter,
+                ]}
+              >
+                <Svg width={20} height={20} viewBox="0 0 24 24">
+                  {/* 5-pointed star path */}
+                  <Polygon
+                    points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"
+                    fill={isEarned ? '#FFD23F' : '#071C38'}
+                    stroke={isEarned ? '#FFF275' : '#0C2A52'}
+                    strokeWidth={isEarned ? '1.2' : '1'}
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+              </View>
+            );
+          })}
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+// Bottom-left circular back button with scaling animation
+function CircularBackButton({ onPress }: { onPress: () => void }): React.JSX.Element {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withTiming(0.9, {
+      duration: 100,
+      easing: Easing.out(Easing.ease),
+    });
+  };
+
+  const handlePressOut = () => {
+    scale.value = withTiming(1, {
+      duration: 150,
+      easing: Easing.out(Easing.ease),
+    });
+  };
+
+  return (
+    <Animated.View style={[styles.backButtonContainer, animatedStyle]}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={styles.backButtonPressable}
+      >
+        <LinearGradient
+          colors={['#073356', '#031D38']}
+          style={styles.backButtonGradient}
+        >
+          {/* Left chevron icon */}
+          <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+            <Path
+              d="M15 19L8 12L15 5"
+              stroke="#00F0FF"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
+        </LinearGradient>
+      </Pressable>
+    </Animated.View>
+  );
+}
 
 export default function LevelSelectionScreen(): React.JSX.Element {
   const navigation = useNavigation<any>();
-  const { currentLevel, maxUnlockedLevel, setCurrentLevel } = usePlayer();
-  const [selectedRange, setSelectedRange] = useState<LevelRange>('1-25');
+  const {
+    currentLevel,
+    maxUnlockedLevel,
+    currentUnlockedLevel: ctxUnlockedLevel,
+    getLevelStars,
+    setCurrentLevel,
+  } = usePlayer();
 
-  const unlockedThreshold = Math.max(1, maxUnlockedLevel || currentLevel || 1);
+  // Strictly compare level against player unlocked progress
+  const currentUnlocked = useMemo(() => {
+    return ctxUnlockedLevel ?? Math.max(1, maxUnlockedLevel ?? currentLevel ?? 8);
+  }, [ctxUnlockedLevel, maxUnlockedLevel, currentLevel]);
 
-  // Range metadata
-  const rangeConfig = useMemo(() => {
-    switch (selectedRange) {
-      case '26-50':
-        return { start: 26, end: 50, isLocked: unlockedThreshold < 26 };
-      case '51-75':
-        return { start: 51, end: 75, isLocked: unlockedThreshold < 51 };
-      case '1-25':
-      default:
-        return { start: 1, end: 25, isLocked: false };
-    }
-  }, [selectedRange, unlockedThreshold]);
-
-  const levelsInRange = useMemo(() => {
-    const list = [];
-    for (let i = rangeConfig.start; i <= rangeConfig.end; i++) {
-      list.push(i);
-    }
-    return list;
-  }, [rangeConfig]);
-
-  const handleSelectLevel = (lvlNum: number) => {
-    if (lvlNum <= unlockedThreshold) {
+  const handleSelectLevel = (levelNumber: number) => {
+    if (levelNumber <= currentUnlocked) {
       try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } catch {
-        // platform without haptics
+        // Haptics fallback
       }
-      setCurrentLevel(lvlNum);
-      navigation.navigate('Play');
+      setCurrentLevel(levelNumber);
+      // Navigate to Gameplay with level param
+      navigation.navigate('Gameplay', { level: levelNumber });
     }
   };
 
-  const cardWidth = Math.floor((SCREEN_WIDTH - 48 - (4 * 10)) / 5);
+  const handleGoBack = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // Haptics fallback
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Home');
+    }
+  };
 
   return (
     <View style={styles.container}>
-      {/* 1. Deep Navy Background Gradient */}
+      {/* 1. Deep Navy Sci-Fi Background Gradient */}
       <LinearGradient
-        colors={[colors.bgTop, '#07132F', colors.bgBottom]}
+        colors={['#020816', '#041029', '#020A1A']}
+        locations={[0, 0.5, 1]}
         style={StyleSheet.absoluteFill}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
       />
 
-      {/* 2. Blueprint Grid Pattern */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Svg width="100%" height="100%">
-          <Defs>
-            <Pattern id="levelsGrid" width="32" height="32" patternUnits="userSpaceOnUse">
-              <Line x1="0" y1="0" x2="32" y2="0" stroke="rgba(0, 240, 255, 0.04)" strokeWidth="1" />
-              <Line x1="0" y1="0" x2="0" y2="32" stroke="rgba(0, 240, 255, 0.04)" strokeWidth="1" />
-            </Pattern>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#levelsGrid)" />
-        </Svg>
-      </View>
-
-      <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-        {/* 1. TOP HEADER: Back Arrow ← | Title "Levels" (Screen 3 Reference) */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('Home')}
-            style={styles.backButton}
-            accessibilityLabel="Back to Home"
+      {/* 2. Abstract Background Cybernetic Grid & Traces Overlay */}
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+        <Defs>
+          {/* Blueprint Grid Pattern */}
+          <Pattern
+            id="cyberGrid"
+            width="32"
+            height="32"
+            patternUnits="userSpaceOnUse"
           >
-            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-              <Path
-                d="M19 12H5M12 19l-7-7 7-7"
-                stroke="#FFFFFF"
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </Svg>
-          </TouchableOpacity>
+            <Rect width="32" height="32" fill="none" />
+            <Line
+              x1="0"
+              y1="0"
+              x2="32"
+              y2="0"
+              stroke="rgba(0, 195, 255, 0.09)"
+              strokeWidth="1"
+            />
+            <Line
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="32"
+              stroke="rgba(0, 195, 255, 0.09)"
+              strokeWidth="1"
+            />
+          </Pattern>
+        </Defs>
 
-          <Text style={styles.headerTitle}>Levels</Text>
-          <View style={{ width: 40 }} />
+        {/* Base Grid */}
+        <Rect width="100%" height="100%" fill="url(#cyberGrid)" />
+
+        {/* Cyber Circuit Lines (Top & Sides) */}
+        <Path
+          d="M0,120 L80,120 L110,150 L110,190"
+          stroke="rgba(0, 220, 255, 0.22)"
+          strokeWidth="1.5"
+          fill="none"
+        />
+        <Circle cx="110" cy="190" r="3.5" fill="#00E5FF" opacity={0.6} />
+
+        <Path
+          d="M0,140 L60,140 L90,170"
+          stroke="rgba(0, 180, 255, 0.15)"
+          strokeWidth="1"
+          fill="none"
+        />
+        <Circle cx="90" cy="170" r="2.5" fill="#00A3FF" opacity={0.4} />
+
+        {/* Top-Right Wireframe Mesh Motif */}
+        <Path
+          d="M260,100 L340,80 L380,130 L310,155 Z"
+          stroke="rgba(0, 220, 255, 0.12)"
+          strokeWidth="1"
+          fill="none"
+        />
+        <Path
+          d="M290,90 L350,140 M340,80 L290,140 M310,155 L320,85"
+          stroke="rgba(0, 200, 255, 0.08)"
+          strokeWidth="1"
+          fill="none"
+        />
+
+        {/* Bottom Cybercircuit Bus Traces */}
+        <Path
+          d="M100,SCREEN_HEIGHT-80 L180,SCREEN_HEIGHT-80 L210,SCREEN_HEIGHT-110 L320,SCREEN_HEIGHT-110"
+          stroke="rgba(0, 220, 255, 0.25)"
+          strokeWidth="1.5"
+          fill="none"
+        />
+        <Path
+          d="M120,680 L200,680 L230,650 L340,650 L340,580"
+          stroke="rgba(0, 220, 255, 0.18)"
+          strokeWidth="1.5"
+          fill="none"
+        />
+        <Circle cx="340" cy="580" r="3.5" fill="#00E5FF" opacity={0.7} />
+        <Path
+          d="M200,680 L200,710 L280,710 L280,680"
+          stroke="rgba(0, 180, 255, 0.2)"
+          strokeWidth="1.2"
+          fill="none"
+        />
+        <Circle cx="280" cy="680" r="3" fill="#00E5FF" opacity={0.6} />
+
+        {/* Bottom-Left Wireframe Mesh */}
+        <Path
+          d="M20,600 L70,570 L110,610 L50,640 Z"
+          stroke="rgba(0, 200, 255, 0.1)"
+          strokeWidth="1"
+          fill="none"
+        />
+        <Path
+          d="M40,585 L90,625 M70,570 L40,630"
+          stroke="rgba(0, 200, 255, 0.08)"
+          strokeWidth="1"
+          fill="none"
+        />
+
+        {/* Bottom-Right Wireframe Mesh */}
+        <Path
+          d="M320,660 L370,640 L400,690 L340,710 Z"
+          stroke="rgba(0, 200, 255, 0.1)"
+          strokeWidth="1"
+          fill="none"
+        />
+      </Svg>
+
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        {/* 3. Header: Sci-Fi "SELECT LEVEL" Badged Banner */}
+        <View style={styles.headerContainer}>
+          {/* Cybernetic Angled Frame Container */}
+          <View style={styles.bannerOuterFrame}>
+            <LinearGradient
+              colors={['rgba(0, 180, 255, 0.18)', 'rgba(4, 30, 60, 0.75)']}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={styles.bannerBackground}
+            >
+              {/* Outer Cyan Cyber Bracket Decoration */}
+              <Svg
+                style={StyleSheet.absoluteFill}
+                width="100%"
+                height="100%"
+                viewBox="0 0 280 60"
+                preserveAspectRatio="none"
+              >
+                {/* Chamfered Box Outline */}
+                <Path
+                  d="M16 2 L264 2 L278 16 L278 44 L264 58 L16 58 L2 44 L2 16 Z"
+                  stroke="#00E5FF"
+                  strokeWidth="2.4"
+                  fill="none"
+                />
+                {/* Upper Left & Right Bracket Accents */}
+                <Line x1="16" y1="2" x2="36" y2="2" stroke="#FFFFFF" strokeWidth="2.5" />
+                <Line x1="244" y1="2" x2="264" y2="2" stroke="#FFFFFF" strokeWidth="2.5" />
+                {/* Side Notch Tabs */}
+                <Path d="M-4 30 L6 30" stroke="#00E5FF" strokeWidth="3" />
+                <Path d="M274 30 L284 30" stroke="#00E5FF" strokeWidth="3" />
+              </Svg>
+
+              <Text style={styles.headerTitleText}>SELECT LEVEL</Text>
+            </LinearGradient>
+          </View>
         </View>
 
-        {/* 2. RANGE TABS: 1-25 | 26-50 🔒 | 51-75 🔒 (Screen 3 Reference) */}
-        <View style={styles.rangeTabsRow}>
-          {/* Tab 1: 1 - 25 */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setSelectedRange('1-25')}
-            style={styles.rangeTabWrapper}
-          >
-            {selectedRange === '1-25' ? (
-              <LinearGradient
-                colors={['#00E5FF', '#007BFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.rangeTabActiveGradient}
-              >
-                <Text style={styles.rangeTabTextActive}>1 - 25</Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.rangeTabInactive}>
-                <Text style={styles.rangeTabTextInactive}>1 - 25</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+        {/* 4. Dynamic 4x3 Grid of 12 Level Nodes */}
+        <View style={styles.gridContainer}>
+          {LEVELS_LIST.map((lvl) => {
+            const isUnlocked = lvl <= currentUnlocked;
+            const stars = getLevelStars ? getLevelStars(lvl) : (isUnlocked ? (lvl === 1 ? 3 : lvl < currentUnlocked ? 2 : 1) : 0);
 
-          {/* Tab 2: 26 - 50 */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setSelectedRange('26-50')}
-            style={styles.rangeTabWrapper}
-          >
-            {selectedRange === '26-50' ? (
-              <LinearGradient
-                colors={['#00E5FF', '#007BFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.rangeTabActiveGradient}
-              >
-                <Text style={styles.rangeTabTextActive}>26 - 50</Text>
-                {unlockedThreshold < 26 && <Text style={styles.lockIconText}> 🔒</Text>}
-              </LinearGradient>
-            ) : (
-              <View style={styles.rangeTabInactive}>
-                <Text style={styles.rangeTabTextInactive}>26 - 50</Text>
-                {unlockedThreshold < 26 && <Text style={styles.lockIconText}> 🔒</Text>}
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Tab 3: 51 - 75 */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setSelectedRange('51-75')}
-            style={styles.rangeTabWrapper}
-          >
-            {selectedRange === '51-75' ? (
-              <LinearGradient
-                colors={['#00E5FF', '#007BFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.rangeTabActiveGradient}
-              >
-                <Text style={styles.rangeTabTextActive}>51 - 75</Text>
-                {unlockedThreshold < 51 && <Text style={styles.lockIconText}> 🔒</Text>}
-              </LinearGradient>
-            ) : (
-              <View style={styles.rangeTabInactive}>
-                <Text style={styles.rangeTabTextInactive}>51 - 75</Text>
-                {unlockedThreshold < 51 && <Text style={styles.lockIconText}> 🔒</Text>}
-              </View>
-            )}
-          </TouchableOpacity>
+            return (
+              <AnimatedLevelNode
+                key={lvl}
+                level={lvl}
+                isUnlocked={isUnlocked}
+                stars={stars}
+                onPress={() => handleSelectLevel(lvl)}
+              />
+            );
+          })}
         </View>
 
-        {/* 3. DENSE 5x5 LEVEL GRID (Screen 3 Reference) */}
-        <ScrollView
-          contentContainerStyle={styles.scrollGridContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.gridContainer}>
-            {levelsInRange.map((lvl) => {
-              const isUnlocked = lvl <= unlockedThreshold;
-              const isCurrent = lvl === currentLevel;
-              const isFirstOrSelected = lvl === currentLevel || (lvl === 1 && unlockedThreshold >= 1);
-
-              return (
-                <TouchableOpacity
-                  key={`lvl-${lvl}`}
-                  activeOpacity={isUnlocked ? 0.8 : 1}
-                  onPress={() => handleSelectLevel(lvl)}
-                  style={[styles.levelCardWrapper, { width: cardWidth, height: cardWidth * 1.08 }]}
-                >
-                  {isUnlocked && isFirstOrSelected ? (
-                    /* Active Level Card: Electric Blue Gradient with Stars */
-                    <LinearGradient
-                      colors={['#00E5FF', '#007BFF']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.activeCardGradient}
-                    >
-                      <Text style={styles.activeCardNumber}>{lvl}</Text>
-                      {/* 3 Golden Stars */}
-                      <View style={styles.starsRow}>
-                        <Text style={styles.starIcon}>★</Text>
-                        <Text style={styles.starIcon}>★</Text>
-                        <Text style={styles.starIcon}>★</Text>
-                      </View>
-                    </LinearGradient>
-                  ) : isUnlocked ? (
-                    /* Unlocked Completed / Available Level Card */
-                    <View style={styles.unlockedCard}>
-                      <Text style={styles.unlockedCardNumber}>{lvl}</Text>
-                      <View style={styles.starsRow}>
-                        <Text style={styles.starIcon}>★</Text>
-                        <Text style={styles.starIcon}>★</Text>
-                        <Text style={styles.starIcon}>★</Text>
-                      </View>
-                    </View>
-                  ) : (
-                    /* Locked Level Card with Padlock Icon (Screen 3 Reference) */
-                    <View style={styles.lockedCard}>
-                      <Text style={styles.lockedCardNumber}>{lvl}</Text>
-                      {/* Padlock Icon */}
-                      <Svg width={13} height={13} viewBox="0 0 24 24" fill="none" style={styles.lockSvg}>
-                        <Rect x="5" y="11" width="14" height="10" rx="2" fill="#4E688F" />
-                        <Path
-                          d="M8 11V7a4 4 0 018 0v4"
-                          stroke="#4E688F"
-                          strokeWidth={2.5}
-                          strokeLinecap="round"
-                        />
-                      </Svg>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
-
-        {/* 4. BOTTOM BANNER: Trophy Card (Screen 3 Reference) */}
-        <View style={styles.bottomBanner}>
-          <View style={styles.trophyIconWrapper}>
-            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-              <Path
-                d="M6 9V2h12v7c0 3.3-2.7 6-6 6s-6-2.7-6-6z"
-                fill="#FFD700"
-                stroke="#FFA000"
-                strokeWidth={1.2}
-              />
-              <Path
-                d="M6 4H3c0 2.8 1.8 5.1 4.3 5.8M18 4h3c0 2.8-1.8 5.1-4.3 5.8M12 15v4M8 22h8"
-                stroke="#FFD700"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </Svg>
-          </View>
-          <Text style={styles.bannerText}>
-            Complete levels to unlock more challenges!
-          </Text>
+        {/* 5. Bottom Navigation Bar with Circular Back Button */}
+        <View style={styles.bottomBar}>
+          <CircularBackButton onPress={handleGoBack} />
         </View>
       </SafeAreaView>
     </View>
@@ -278,180 +447,178 @@ export default function LevelSelectionScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bgTop,
+    backgroundColor: '#020816',
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: 20,
     justifyContent: 'space-between',
   },
-  header: {
-    flexDirection: 'row',
+
+  /* Header Sci-Fi Banner */
+  headerContainer: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(10, 25, 56, 0.8)',
-    borderWidth: 1.2,
-    borderColor: 'rgba(0, 240, 255, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  bannerOuterFrame: {
+    width: Math.min(SCREEN_WIDTH * 0.78, 300),
+    height: 56,
+    borderRadius: 8,
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.85,
+    shadowRadius: 14,
+    elevation: 10,
   },
-  headerTitle: {
-    fontFamily: 'Sora_700Bold',
-    fontSize: 22,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  rangeTabsRow: {
-    flexDirection: 'row',
+  bannerBackground: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginVertical: 10,
-  },
-  rangeTabWrapper: {
-    borderRadius: 18,
+    borderRadius: 8,
     overflow: 'hidden',
   },
-  rangeTabActiveGradient: {
-    paddingVertical: 7,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: colors.primaryA,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 3,
+  headerTitleText: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 3,
+    color: '#D4F5FF',
+    textShadowColor: '#00D4FF',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
-  rangeTabTextActive: {
-    fontFamily: 'Sora_700Bold',
-    fontSize: 13,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  rangeTabInactive: {
-    paddingVertical: 7,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.panelBorder,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rangeTabTextInactive: {
-    fontFamily: 'Sora_600SemiBold',
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  lockIconText: {
-    fontSize: 10,
-  },
-  scrollGridContent: {
-    paddingVertical: 8,
-  },
+
+  /* 4x3 Level Grid */
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'center',
+    justifyContent: 'space-around',
+    alignContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    rowGap: 16,
   },
-  levelCardWrapper: {
-    borderRadius: 18,
-    overflow: 'hidden',
-  },
-  activeCardGradient: {
-    flex: 1,
-    borderRadius: 18,
+
+  /* Level Node */
+  nodeWrapper: {
+    width: '30%',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 5,
-    paddingVertical: 4,
   },
-  activeCardNumber: {
-    fontFamily: 'Sora_800ExtraBold',
-    fontSize: 17,
-    color: '#FFFFFF',
+  nodePressable: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  starsRow: {
+  nodeLockedPressable: {
+    opacity: 0.42,
+  },
+
+  /* Concentric Outer Ring */
+  outerRing: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 3.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outerRingUnlocked: {
+    borderColor: '#00F0FF',
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.85,
+    shadowRadius: 12,
+    elevation: 9,
+  },
+  outerRingLocked: {
+    borderColor: '#18385C',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+
+  /* Middle Metallic Ring */
+  middleRing: {
+    width: 73,
+    height: 73,
+    borderRadius: 36.5,
+    borderWidth: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  middleRingUnlocked: {
+    borderColor: '#062B54',
+  },
+  middleRingLocked: {
+    borderColor: '#0C1E34',
+  },
+
+  /* Inner Gradient Center Circle */
+  innerCircle: {
+    width: 61,
+    height: 61,
+    borderRadius: 30.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  levelNumberText: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#E6F8FF',
+    textShadowColor: 'rgba(0, 220, 255, 0.7)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+
+  /* Achievement Stars Container Below Node */
+  starsContainer: {
     flexDirection: 'row',
-    gap: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+    height: 22,
+    gap: 3,
+  },
+  starItem: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starCenter: {
     marginTop: 2,
   },
-  starIcon: {
-    fontSize: 8.5,
-    color: colors.star,
+
+  /* Bottom Bar */
+  bottomBar: {
+    height: 72,
+    paddingHorizontal: 24,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
-  unlockedCard: {
+
+  /* Circular Back Button */
+  backButtonContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 3,
+    borderColor: '#00F0FF',
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  backButtonPressable: {
     flex: 1,
-    borderRadius: 18,
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.panelBorder,
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  backButtonGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
-  },
-  unlockedCardNumber: {
-    fontFamily: 'Sora_700Bold',
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-  lockedCard: {
-    flex: 1,
-    borderRadius: 18,
-    backgroundColor: 'rgba(7, 18, 42, 0.65)',
-    borderWidth: 1,
-    borderColor: 'rgba(46, 123, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-  },
-  lockedCardNumber: {
-    fontFamily: 'Sora_600SemiBold',
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  lockSvg: {
-    marginTop: 3,
-    opacity: 0.7,
-  },
-  bottomBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.panel,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.panelBorder,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 8,
-    marginTop: 6,
-  },
-  trophyIconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 200, 61, 0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bannerText: {
-    fontFamily: 'Sora_400Regular',
-    fontSize: 12.5,
-    color: colors.textSecondary,
-    flex: 1,
   },
 });

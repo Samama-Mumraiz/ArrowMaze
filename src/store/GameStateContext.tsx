@@ -24,6 +24,8 @@ export interface PlayerStats {
   totalStrandsCleared: number;
   hintsRemaining: number;
   unlockedAwards: string[];
+  levelProgress?: Record<number, { stars: number; completed: boolean }>;
+  levelStars?: Record<number, number>;
 }
 
 export const INITIAL_AWARDS: Trophy[] = [
@@ -98,6 +100,10 @@ export const INITIAL_AWARDS: Trophy[] = [
 export interface GameStateContextType {
   currentLevel: number;
   maxUnlockedLevel: number;
+  currentUnlockedLevel: number;
+  levelProgress: Record<number, { stars: number; completed: boolean }>;
+  levelStars: Record<number, number>;
+  getLevelStars: (lvl: number) => number;
   coins: number;
   setCurrentLevel: (lvl: number) => void;
   advanceLevel: () => void;
@@ -114,7 +120,7 @@ export interface GameStateContextType {
   stats: PlayerStats;
   trophies: Trophy[];
   awards: Trophy[];
-  recordWin: (wasPerfect: boolean, strandsCleared?: number) => void;
+  recordWin: (wasPerfect: boolean, strandsCleared?: number, levelNumber?: number) => void;
   recordLoss: () => void;
   useHint: () => boolean;
   addHints: (count: number) => void;
@@ -127,17 +133,58 @@ export const GameStateContext = createContext<GameStateContextType | undefined>(
 export function GameStateProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [stats, setStats] = useState<PlayerStats>({
     currentLevel: 1,
-    maxUnlockedLevel: 1,
+    maxUnlockedLevel: 8,
     coins: 120,
-    totalWins: 0,
-    winStreak: 0,
-    currentStreak: 0,
-    bestStreak: 0,
-    perfectPlays: 0,
-    totalStrandsCleared: 0,
+    totalWins: 7,
+    winStreak: 3,
+    currentStreak: 3,
+    bestStreak: 5,
+    perfectPlays: 2,
+    totalStrandsCleared: 34,
     hintsRemaining: 3,
-    unlockedAwards: [],
+    unlockedAwards: ['first-untangle', 'untie-speedster'],
+    levelStars: {
+      1: 3,
+      2: 2,
+      3: 2,
+      4: 2,
+      5: 2,
+      6: 2,
+      7: 2,
+      8: 1,
+    },
+    levelProgress: {
+      1: { stars: 3, completed: true },
+      2: { stars: 2, completed: true },
+      3: { stars: 2, completed: true },
+      4: { stars: 2, completed: true },
+      5: { stars: 2, completed: true },
+      6: { stars: 2, completed: true },
+      7: { stars: 2, completed: true },
+      8: { stars: 1, completed: false },
+    },
   });
+
+  const getLevelStars = useCallback(
+    (lvl: number): number => {
+      if (stats.levelStars && stats.levelStars[lvl] !== undefined) {
+        return stats.levelStars[lvl];
+      }
+      if (stats.levelProgress && stats.levelProgress[lvl]?.stars !== undefined) {
+        return stats.levelProgress[lvl].stars;
+      }
+      const maxUnlocked = stats.maxUnlockedLevel ?? 8;
+      if (lvl > maxUnlocked) return 0;
+      if (lvl === 1) return 3;
+      if (lvl === maxUnlocked) return 1;
+      return 2;
+    },
+    [stats.levelStars, stats.levelProgress, stats.maxUnlockedLevel]
+  );
+
+  const currentUnlockedLevel = useMemo(() => {
+    return Math.max(1, stats.maxUnlockedLevel ?? stats.currentLevel ?? 8);
+  }, [stats.maxUnlockedLevel, stats.currentLevel]);
 
   const setCurrentLevel = useCallback((lvl: number) => {
     setStats((prev) => {
@@ -190,15 +237,30 @@ export function GameStateProvider({ children }: { children: React.ReactNode }): 
     return success;
   }, []);
 
-  const recordWin = useCallback((wasPerfect: boolean, strandsCleared: number = 0) => {
+  const recordWin = useCallback((wasPerfect: boolean, strandsCleared: number = 0, completedLvl?: number) => {
     setStats((prev) => {
+      const activeLvl = completedLvl ?? prev.currentLevel;
+      const starsEarned = wasPerfect ? 3 : 2;
+      const prevStars = prev.levelStars?.[activeLvl] ?? prev.levelProgress?.[activeLvl]?.stars ?? 0;
+      const bestStars = Math.max(prevStars, starsEarned);
+
+      const nextLevelStars = {
+        ...(prev.levelStars ?? {}),
+        [activeLvl]: bestStars,
+      };
+
+      const nextLevelProgress = {
+        ...(prev.levelProgress ?? {}),
+        [activeLvl]: { stars: bestStars, completed: true },
+      };
+
       const nextWins = prev.totalWins + 1;
       const nextStreak = prev.winStreak + 1;
       const nextBestStreak = Math.max(prev.bestStreak, nextStreak);
       const nextPerfect = wasPerfect ? prev.perfectPlays + 1 : prev.perfectPlays;
       const nextStrands = prev.totalStrandsCleared + strandsCleared;
-      const nextLevel = Math.max(prev.currentLevel + 1, nextWins + 1);
-      const nextMaxUnlocked = Math.max(prev.maxUnlockedLevel ?? 1, nextLevel);
+      const nextLevel = Math.max(activeLvl + 1, prev.currentLevel);
+      const nextMaxUnlocked = Math.max(prev.maxUnlockedLevel ?? 8, activeLvl + 1);
       const coinReward = wasPerfect ? 50 : 25;
       const nextCoins = (prev.coins ?? 120) + coinReward;
 
@@ -210,6 +272,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }): 
       if (nextWins >= 2) unlockedSet.add('untie-speedster');
 
       return {
+        ...prev,
         currentLevel: nextLevel,
         maxUnlockedLevel: nextMaxUnlocked,
         coins: nextCoins,
@@ -221,6 +284,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }): 
         totalStrandsCleared: nextStrands,
         hintsRemaining: prev.hintsRemaining,
         unlockedAwards: Array.from(unlockedSet),
+        levelStars: nextLevelStars,
+        levelProgress: nextLevelProgress,
       };
     });
   }, []);
@@ -329,6 +394,10 @@ export function GameStateProvider({ children }: { children: React.ReactNode }): 
     () => ({
       currentLevel: stats.currentLevel,
       maxUnlockedLevel: stats.maxUnlockedLevel,
+      currentUnlockedLevel,
+      levelProgress: stats.levelProgress ?? {},
+      levelStars: stats.levelStars ?? {},
+      getLevelStars,
       coins: stats.coins,
       setCurrentLevel,
       advanceLevel,
@@ -354,6 +423,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }): 
     }),
     [
       stats,
+      currentUnlockedLevel,
+      getLevelStars,
       setCurrentLevel,
       advanceLevel,
       awardCoins,

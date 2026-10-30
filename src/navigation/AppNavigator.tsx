@@ -15,7 +15,8 @@ export type RootTabParamList = {
   Splash: undefined;
   Home: undefined;
   Play: undefined;
-  Game?: undefined;
+  Game?: { level?: number } | undefined;
+  Gameplay?: { level?: number } | undefined;
   LevelSelection: undefined;
   Levels?: undefined;
   Profile: undefined;
@@ -82,6 +83,7 @@ export default function AppNavigator(): React.JSX.Element {
           route.name === 'Home' ||
           route.name === 'Play' ||
           (route.name as string) === 'Game' ||
+          (route.name as string) === 'Gameplay' ||
           (route.name as string) === 'LevelSelection' ||
           (route.name as string) === 'Levels' ||
           route.name === 'Settings';
@@ -150,6 +152,16 @@ export default function AppNavigator(): React.JSX.Element {
       {/* 2b. Game Route Alias */}
       <Tab.Screen
         name="Game"
+        component={GameScreen}
+        options={{
+          tabBarStyle: { display: 'none' },
+          tabBarButton: () => null,
+        }}
+      />
+
+      {/* 2c. Gameplay Route Alias */}
+      <Tab.Screen
+        name="Gameplay"
         component={GameScreen}
         options={{
           tabBarStyle: { display: 'none' },
