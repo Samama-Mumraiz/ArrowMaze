@@ -35,7 +35,7 @@ import { typography } from '../theme/typography';
 import { usePlayer } from '../store/PlayerContext';
 import NeonIsometricCube from '../view/components/NeonIsometricCube';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function HomeScreen(): React.JSX.Element {
   const navigation = useNavigation<any>();
@@ -59,7 +59,7 @@ export default function HomeScreen(): React.JSX.Element {
     transform: [{ translateY: translateY.value }],
   }));
 
-  // Reanimated button scale micro-interactions (press-in to 0.95, spring back to 1.0)
+  // Reanimated button micro-interactions (press-in to 0.95, spring back to 1.0)
   const playScale = useSharedValue(1);
   const levelsScale = useSharedValue(1);
 
@@ -119,29 +119,50 @@ export default function HomeScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      {/* 1. Deep Midnight Navy Background Gradient */}
+      {/* 1. Strictly Deep Navy / Midnight Blue Gradient Background (#040D21) */}
       <LinearGradient
-        colors={['#020617', '#061332', '#030A1C']}
+        colors={['#020718', '#040D21', '#02091A']}
         style={StyleSheet.absoluteFill}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
       />
 
-      {/* 2. Cybernetic Diagonal Chevron/Maze Pattern & Neon Laser Flares */}
+      {/* 2. Cybernetic Grid & Abstract Cyber-Lines Pattern (No Cartoon/Nature Elements) */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Svg width="100%" height="100%">
           <Defs>
+            {/* Blueprint Grid Pattern matching Level Screen */}
+            <Pattern id="cyberGrid" width="32" height="32" patternUnits="userSpaceOnUse">
+              <Rect width="32" height="32" fill="none" />
+              <Line
+                x1="0"
+                y1="0"
+                x2="32"
+                y2="0"
+                stroke="rgba(0, 195, 255, 0.07)"
+                strokeWidth="1"
+              />
+              <Line
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="32"
+                stroke="rgba(0, 195, 255, 0.07)"
+                strokeWidth="1"
+              />
+            </Pattern>
+
             {/* Repeating 45-degree chevron maze corridor pattern */}
             <Pattern id="neonMazePattern" width="56" height="56" patternUnits="userSpaceOnUse">
               <Path
                 d="M 0 28 L 28 0 L 56 28 L 28 56 Z"
-                stroke="rgba(0, 190, 255, 0.07)"
+                stroke="rgba(0, 190, 255, 0.06)"
                 strokeWidth="1.2"
                 fill="none"
               />
               <Path
                 d="M 14 14 L 28 28 L 42 14 M 14 42 L 28 28 L 42 42"
-                stroke="rgba(0, 160, 255, 0.04)"
+                stroke="rgba(0, 160, 255, 0.03)"
                 strokeWidth="1"
                 fill="none"
               />
@@ -154,19 +175,47 @@ export default function HomeScreen(): React.JSX.Element {
               <Stop offset="100%" stopColor="#007BFF" stopOpacity="0" />
             </SvgLinearGradient>
 
-            {/* Ambient background glow behind hero */}
+            {/* Ambient background glow behind hero cube */}
             <SvgRadialGradient id="centerHeroAura" cx="50%" cy="40%" r="50%">
-              <Stop offset="0%" stopColor="#007BFF" stopOpacity="0.22" />
-              <Stop offset="40%" stopColor="#00D2FF" stopOpacity="0.08" />
-              <Stop offset="100%" stopColor="#020617" stopOpacity="0" />
+              <Stop offset="0%" stopColor="#007BFF" stopOpacity="0.24" />
+              <Stop offset="40%" stopColor="#00D2FF" stopOpacity="0.09" />
+              <Stop offset="100%" stopColor="#040D21" stopOpacity="0" />
             </SvgRadialGradient>
           </Defs>
+
+          {/* Blueprint Grid */}
+          <Rect width="100%" height="100%" fill="url(#cyberGrid)" />
 
           {/* Maze Pattern Fill */}
           <Rect width="100%" height="100%" fill="url(#neonMazePattern)" />
 
           {/* Central Blue Aura Glow */}
           <Rect width="100%" height="100%" fill="url(#centerHeroAura)" />
+
+          {/* Cybernetic Circuit Traces & Terminal Nodes */}
+          <Path
+            d="M0,150 L65,150 L95,180"
+            stroke="rgba(0, 220, 255, 0.22)"
+            strokeWidth="1.5"
+            fill="none"
+          />
+          <Circle cx="95" cy="180" r="3" fill="#00E5FF" opacity={0.65} />
+
+          <Path
+            d={`M${SCREEN_WIDTH},110 L${SCREEN_WIDTH - 60},110 L${SCREEN_WIDTH - 90},140`}
+            stroke="rgba(0, 220, 255, 0.2)"
+            strokeWidth="1.5"
+            fill="none"
+          />
+          <Circle cx={SCREEN_WIDTH - 90} cy={140} r="3" fill="#00E5FF" opacity={0.6} />
+
+          <Path
+            d={`M0,${SCREEN_HEIGHT - 170} L70,${SCREEN_HEIGHT - 170} L100,${SCREEN_HEIGHT - 200}`}
+            stroke="rgba(0, 200, 255, 0.16)"
+            strokeWidth="1.2"
+            fill="none"
+          />
+          <Circle cx="100" cy={SCREEN_HEIGHT - 200} r="2.5" fill="#00D2FF" opacity={0.5} />
 
           {/* Top-Left Glowing Laser Flare at 45° */}
           <Line x1="10" y1="120" x2="140" y2="40" stroke="url(#streakGlow)" strokeWidth="2.5" />
@@ -182,7 +231,7 @@ export default function HomeScreen(): React.JSX.Element {
           />
 
           {/* Lower-Left Faint Flare */}
-          <Line x1="-20" y1="480" x2="100" y2="410" stroke="url(#streakGlow)" strokeWidth="1.8" />
+          <Line x1="-20" y1="520" x2="100" y2="450" stroke="url(#streakGlow)" strokeWidth="1.8" />
         </Svg>
       </View>
 
@@ -192,7 +241,7 @@ export default function HomeScreen(): React.JSX.Element {
           {/* TOP HUD: Settings Gear (Left) | Gold Star Coin Pill (Right)   */}
           {/* ============================================================== */}
           <View style={styles.topBar}>
-            {/* Circular Settings Gear Button */}
+            {/* Circular Settings Gear Button with glowing cyan border */}
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleSettingsPress}
@@ -211,7 +260,7 @@ export default function HomeScreen(): React.JSX.Element {
               </Svg>
             </TouchableOpacity>
 
-            {/* Gold Star Coin Balance Pill */}
+            {/* Gold Star Coin Balance Pill with glowing cyan border */}
             <View style={styles.coinPill}>
               <Svg width={24} height={24} viewBox="0 0 28 28" fill="none">
                 <Defs>
@@ -252,7 +301,7 @@ export default function HomeScreen(): React.JSX.Element {
           </View>
 
           {/* ============================================================== */}
-          {/* CENTER HERO: 3D Isometric Neon Cube on Glowing Platform        */}
+          {/* CENTER HERO: 3D Isometric Cyber-Cube on Glowing Platform        */}
           {/* ============================================================== */}
           <Animated.View style={[styles.heroCubeContainer, animatedCubeStyle]}>
             <NeonIsometricCube size={225} showPedestal={true} />
@@ -262,7 +311,7 @@ export default function HomeScreen(): React.JSX.Element {
           {/* GLOSSY GRADIENT BUTTONS: Play, Levels (Animated Scaling)       */}
           {/* ============================================================== */}
           <View style={styles.buttonsStack}>
-            {/* 1. PLAY BUTTON (Vibrant Glossy Cyan-to-Blue Linear Gradient) */}
+            {/* 1. PLAY BUTTON (Glossy Electric Cyan-to-Blue Linear Gradient) */}
             <Animated.View style={[styles.buttonAnimatedContainer, animatedPlayBtnStyle]}>
               <TouchableOpacity
                 activeOpacity={0.92}
@@ -273,7 +322,7 @@ export default function HomeScreen(): React.JSX.Element {
                 accessibilityLabel="Play Game"
               >
                 <LinearGradient
-                  colors={['#00D2FF', '#0084FF', '#004FD6']}
+                  colors={['#00D8FF', '#0084FF', '#004FD6']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 0, y: 1 }}
                   style={styles.primaryButtonGradient}
@@ -299,7 +348,7 @@ export default function HomeScreen(): React.JSX.Element {
               </TouchableOpacity>
             </Animated.View>
 
-            {/* 2. LEVELS BUTTON (Glossy Metallic Dark Blue with Cyan Border) */}
+            {/* 2. LEVELS BUTTON (Glossy Deep Metallic Blue with Cyan Border) */}
             <Animated.View style={[styles.buttonAnimatedContainer, animatedLevelsBtnStyle]}>
               <TouchableOpacity
                 activeOpacity={0.92}
@@ -310,7 +359,7 @@ export default function HomeScreen(): React.JSX.Element {
                 accessibilityLabel="Select Level"
               >
                 <LinearGradient
-                  colors={['#0C2556', '#081A40', '#040D24']}
+                  colors={['#0C2758', '#071A3F', '#040F26']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 0, y: 1 }}
                   style={styles.secondaryButtonGradient}
@@ -360,7 +409,7 @@ export default function HomeScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#040D21',
   },
   safeArea: {
     flex: 1,
@@ -382,32 +431,32 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(8, 23, 56, 0.85)',
+    backgroundColor: 'rgba(4, 18, 44, 0.85)',
     borderWidth: 1.5,
-    borderColor: 'rgba(0, 240, 255, 0.45)',
+    borderColor: 'rgba(0, 240, 255, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#00F0FF',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 5,
   },
   coinPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(8, 23, 56, 0.85)',
+    backgroundColor: 'rgba(4, 18, 44, 0.85)',
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: 'rgba(0, 240, 255, 0.45)',
+    borderColor: 'rgba(0, 240, 255, 0.55)',
     gap: 8,
     shadowColor: '#00F0FF',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 5,
   },
   coinText: {
     fontFamily: typography.fontFamily.bold,
@@ -426,21 +475,21 @@ const styles = StyleSheet.create({
   },
   logoTextWhite: {
     fontFamily: typography.fontFamily.extraBold,
-    fontSize: 38,
+    fontSize: 40,
     color: '#FFFFFF',
     letterSpacing: -0.5,
-    textShadowColor: 'rgba(0, 240, 255, 0.35)',
+    textShadowColor: 'rgba(0, 240, 255, 0.4)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
   logoTextMaze: {
     fontFamily: typography.fontFamily.extraBold,
-    fontSize: 38,
+    fontSize: 40,
     color: '#00F0FF',
     letterSpacing: -0.5,
-    textShadowColor: 'rgba(0, 240, 255, 0.85)',
+    textShadowColor: 'rgba(0, 240, 255, 0.95)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 14,
+    textShadowRadius: 16,
   },
   tagline: {
     fontFamily: typography.fontFamily.regular,
@@ -473,7 +522,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#00D2FF',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.8,
+    shadowOpacity: 0.85,
     shadowRadius: 18,
     elevation: 10,
   },
@@ -501,9 +550,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#007BFF',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 6,
   },
   secondaryButtonGradient: {
     flex: 1,
@@ -512,7 +561,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 22,
     borderWidth: 1.5,
-    borderColor: 'rgba(0, 200, 255, 0.55)',
+    borderColor: 'rgba(0, 220, 255, 0.65)',
     borderRadius: 26,
   },
   secondaryButtonText: {
