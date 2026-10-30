@@ -1,12 +1,17 @@
 import React, { useMemo } from 'react';
 import { View, StyleSheet, useWindowDimensions, GestureResponderEvent } from 'react-native';
-import Svg, { Defs, Pattern, Line, Rect } from 'react-native-svg';
+import Svg, {
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Stop,
+  Rect,
+  Path,
+  G,
+} from 'react-native-svg';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import Arrow from './Arrow';
 import { TangledStrand } from '../../model/types';
 import { checkStrandRaycast } from '../../model/raycast';
-import { useTheme } from '../../theme/ThemeContext';
-import { colors } from '../../theme/colors';
 
 interface BoardViewProps {
   strands: TangledStrand[];
@@ -33,13 +38,13 @@ export default function BoardView({
   onStrandPress,
   onExitComplete,
 }: BoardViewProps): React.JSX.Element {
-  const { theme } = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
-  // Dense Maze Layout: blueprint grid frame sized proportionally to screen
+  // Dynamic, modular calculation for flexible and irregular grid sizes
   const { cellSize, boardWidth, boardHeight } = useMemo(() => {
+    // Leave safe padding for HUD and bottom controls
     const maxAvailableWidth = screenWidth - 28;
-    const maxAvailableHeight = Math.max(380, screenHeight - 210);
+    const maxAvailableHeight = Math.max(340, screenHeight - 230);
 
     const size = Math.floor(Math.min(maxAvailableWidth / cols, maxAvailableHeight / rows));
     return {
@@ -130,6 +135,17 @@ export default function BoardView({
     transform: [{ translateX: screenShake.value }],
   }));
 
+  // Build 2D list of modular tiles
+  const tilesList = useMemo(() => {
+    const list: Array<{ r: number; c: number }> = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        list.push({ r, c });
+      }
+    }
+    return list;
+  }, [rows, cols]);
+
   return (
     <Animated.View
       style={[
@@ -141,53 +157,85 @@ export default function BoardView({
         animatedBoardShakeStyle,
       ]}
     >
-      {/* 1. Dark Blueprint-Style Grid Background (Screen 4 Reference) */}
+      {/* ============================================================== */}
+      {/* 1. BORDERLESS FLAT DARK-BLUE SQUARE TILE GRID                  */}
+      {/* (No bulky island frames, no grassy borders around puzzle)     */}
+      {/* ============================================================== */}
       <View
         style={[
-          styles.blueprintFrame,
+          styles.tilesContainer,
           {
             width: boardWidth,
             height: boardHeight,
           },
         ]}
+        pointerEvents="none"
       >
-        <Svg width="100%" height="100%">
+        <Svg width={boardWidth} height={boardHeight} viewBox={`0 0 ${boardWidth} ${boardHeight}`}>
           <Defs>
-            <Pattern
-              id="boardBlueprintGrid"
-              width={cellSize}
-              height={cellSize}
-              patternUnits="userSpaceOnUse"
-            >
-              <Line
-                x1="0"
-                y1="0"
-                x2={cellSize}
-                y2="0"
-                stroke="rgba(0, 240, 255, 0.08)"
-                strokeWidth="0.8"
-              />
-              <Line
-                x1="0"
-                y1="0"
-                x2="0"
-                y2={cellSize}
-                stroke="rgba(0, 240, 255, 0.08)"
-                strokeWidth="0.8"
-              />
-            </Pattern>
+            {/* Tile Surface Gradient */}
+            <SvgLinearGradient id="tileBodyGrad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor="#1B3F6B" />
+              <Stop offset="40%" stopColor="#143256" />
+              <Stop offset="100%" stopColor="#0D223C" />
+            </SvgLinearGradient>
+
+            {/* Tile Highlight Rim */}
+            <SvgLinearGradient id="tileHighlightRim" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0%" stopColor="#3B6FA8" />
+              <Stop offset="100%" stopColor="#16375E" />
+            </SvgLinearGradient>
           </Defs>
-          <Rect
-            x="0"
-            y="0"
-            width={boardWidth}
-            height={boardHeight}
-            fill="url(#boardBlueprintGrid)"
-          />
+
+          {/* Render individual modular square tiles with gaps */}
+          {tilesList.map(({ r, c }) => {
+            const tileX = c * cellSize + 2;
+            const tileY = r * cellSize + 2;
+            const tileSize = cellSize - 4;
+            const tileRadius = Math.max(4, Math.floor(cellSize * 0.13));
+
+            return (
+              <G key={`tile-${r}-${c}`}>
+                {/* 3D Under-Shadow */}
+                <Rect
+                  x={tileX}
+                  y={tileY + 2.5}
+                  width={tileSize}
+                  height={tileSize}
+                  rx={tileRadius}
+                  fill="#061221"
+                  opacity={0.65}
+                />
+
+                {/* Flat Dark-Blue Tile Face */}
+                <Rect
+                  x={tileX}
+                  y={tileY}
+                  width={tileSize}
+                  height={tileSize}
+                  rx={tileRadius}
+                  fill="url(#tileBodyGrad)"
+                  stroke="url(#tileHighlightRim)"
+                  strokeWidth="1.2"
+                />
+
+                {/* Subtle Tile Corner Stone Texture Accent */}
+                <Path
+                  d={`M${tileX + 4},${tileY + 5} L${tileX + 10},${tileY + 5} M${tileX + 5},${tileY + 4} L${tileX + 5},${tileY + 10}`}
+                  stroke="#3B6FA8"
+                  strokeWidth="0.8"
+                  strokeLinecap="round"
+                  opacity={0.4}
+                />
+              </G>
+            );
+          })}
         </Svg>
       </View>
 
-      {/* 2. Board Canvas with Touch Responder & Neon Arrows */}
+      {/* ============================================================== */}
+      {/* 2. BOARD CANVAS WITH TOUCH RESPONDER & NEON ARROWS             */}
+      {/* ============================================================== */}
       <View
         style={[
           styles.boardCanvas,
@@ -204,16 +252,23 @@ export default function BoardView({
           pointerEvents="none"
         >
           {strands.map((strand, index) => {
-            // Give one strand the vibrant Neon Magenta accent color (Screen 4 Reference)
-            const strandWithAccent = {
+            // Identify accent pathway arrow (render in vibrant Red/Coral matching reference)
+            const isRedAccent =
+              strand.color === '#FF2A85' ||
+              strand.color === '#FF3366' ||
+              index === strands.length - 1 || // bottom-most strand
+              strand.id?.includes('magenta') ||
+              strand.id?.includes('accent');
+
+            const strandWithColor = {
               ...strand,
-              color: strand.color || (index === 1 ? '#FF2A85' : '#00F0FF'),
+              color: isRedAccent ? '#FF3366' : '#00F0FF',
             };
 
             return (
               <Arrow
                 key={strand.id}
-                strand={strandWithAccent}
+                strand={strandWithColor}
                 cellSize={cellSize}
                 boardWidth={boardWidth}
                 boardHeight={boardHeight}
@@ -241,7 +296,7 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     backgroundColor: 'transparent',
   },
-  blueprintFrame: {
+  tilesContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
