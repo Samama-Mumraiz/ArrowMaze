@@ -26,17 +26,14 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
+  withSpring,
   Easing,
 } from 'react-native-reanimated';
-import MaskedView from '@react-native-masked-view/masked-view';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { usePlayer } from '../store/PlayerContext';
 import NeonIsometricCube from '../view/components/NeonIsometricCube';
-
-const MaskedViewComponent = MaskedView as unknown as React.ComponentType<any>;
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -61,6 +58,34 @@ export default function HomeScreen(): React.JSX.Element {
   const animatedCubeStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
   }));
+
+  // Reanimated button scale micro-interactions (press-in to 0.95, spring back to 1.0)
+  const playScale = useSharedValue(1);
+  const levelsScale = useSharedValue(1);
+
+  const animatedPlayBtnStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: playScale.value }],
+  }));
+
+  const animatedLevelsBtnStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: levelsScale.value }],
+  }));
+
+  const handlePlayPressIn = () => {
+    playScale.value = withTiming(0.95, { duration: 100, easing: Easing.out(Easing.ease) });
+  };
+
+  const handlePlayPressOut = () => {
+    playScale.value = withSpring(1, { damping: 14, stiffness: 220 });
+  };
+
+  const handleLevelsPressIn = () => {
+    levelsScale.value = withTiming(0.95, { duration: 100, easing: Easing.out(Easing.ease) });
+  };
+
+  const handleLevelsPressOut = () => {
+    levelsScale.value = withSpring(1, { damping: 14, stiffness: 220 });
+  };
 
   const handlePlayPress = () => {
     try {
@@ -191,9 +216,9 @@ export default function HomeScreen(): React.JSX.Element {
               <Svg width={24} height={24} viewBox="0 0 28 28" fill="none">
                 <Defs>
                   <SvgLinearGradient id="goldCoinGrad" x1="0" y1="0" x2="1" y2="1">
-                    <Stop offset="0" stopColor="#FFE066" />
-                    <Stop offset="0.5" stopColor="#FFB800" />
-                    <Stop offset="1" stopColor="#E68A00" />
+                    <Stop offset="0%" stopColor="#FFE066" />
+                    <Stop offset="0.5%" stopColor="#FFB800" />
+                    <Stop offset="1%" stopColor="#E68A00" />
                   </SvgLinearGradient>
                   <SvgRadialGradient id="goldCoinGlow" cx="50%" cy="50%" r="50%">
                     <Stop offset="0%" stopColor="#FFF2A3" />
@@ -219,19 +244,7 @@ export default function HomeScreen(): React.JSX.Element {
           <View style={styles.brandContainer}>
             <View style={styles.logoRow}>
               <Text style={styles.logoTextWhite}>Arrow</Text>
-              <MaskedViewComponent
-                maskElement={
-                  <Text style={styles.logoTextMazeMask}>Maze</Text>
-                }
-              >
-                <LinearGradient
-                  colors={['#00F0FF', '#007BFF']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  <Text style={styles.logoTextMazePlaceholder}>Maze</Text>
-                </LinearGradient>
-              </MaskedViewComponent>
+              <Text style={styles.logoTextMaze}>Maze</Text>
             </View>
             <Text style={styles.tagline}>
               Your Logic <Text style={styles.taglineDot}>•</Text> Your Path
@@ -246,117 +259,85 @@ export default function HomeScreen(): React.JSX.Element {
           </Animated.View>
 
           {/* ============================================================== */}
-          {/* GLOSSY GRADIENT BUTTONS: Play, Levels, Settings               */}
+          {/* GLOSSY GRADIENT BUTTONS: Play, Levels (Animated Scaling)       */}
           {/* ============================================================== */}
           <View style={styles.buttonsStack}>
             {/* 1. PLAY BUTTON (Vibrant Glossy Cyan-to-Blue Linear Gradient) */}
-            <TouchableOpacity
-              activeOpacity={0.88}
-              onPress={handlePlayPress}
-              style={styles.primaryButtonWrapper}
-              accessibilityLabel="Play Game"
-            >
-              <LinearGradient
-                colors={['#00D2FF', '#0084FF', '#004FD6']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.primaryButtonGradient}
+            <Animated.View style={[styles.buttonAnimatedContainer, animatedPlayBtnStyle]}>
+              <TouchableOpacity
+                activeOpacity={0.92}
+                onPressIn={handlePlayPressIn}
+                onPressOut={handlePlayPressOut}
+                onPress={handlePlayPress}
+                style={styles.primaryButtonWrapper}
+                accessibilityLabel="Play Game"
               >
-                <View style={styles.btnIconLeft}>
-                  <Svg width={22} height={22} viewBox="0 0 24 24" fill="#FFFFFF">
-                    <Polygon points="7,4 20,12 7,20" />
-                  </Svg>
-                </View>
-                <Text style={styles.primaryButtonText}>Play</Text>
-                <View style={styles.btnIconRight}>
-                  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                    <Path
-                      d="M9 18l6-6-6-6"
-                      stroke="#FFFFFF"
-                      strokeWidth={2.6}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </Svg>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={['#00D2FF', '#0084FF', '#004FD6']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={styles.primaryButtonGradient}
+                >
+                  <View style={styles.btnIconLeft}>
+                    <Svg width={22} height={22} viewBox="0 0 24 24" fill="#FFFFFF">
+                      <Polygon points="7,4 20,12 7,20" />
+                    </Svg>
+                  </View>
+                  <Text style={styles.primaryButtonText}>Play</Text>
+                  <View style={styles.btnIconRight}>
+                    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                      <Path
+                        d="M9 18l6-6-6-6"
+                        stroke="#FFFFFF"
+                        strokeWidth={2.6}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </Svg>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
 
             {/* 2. LEVELS BUTTON (Glossy Metallic Dark Blue with Cyan Border) */}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handleLevelsPress}
-              style={styles.secondaryButtonWrapper}
-              accessibilityLabel="Select Level"
-            >
-              <LinearGradient
-                colors={['#0C2556', '#081A40', '#040D24']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.secondaryButtonGradient}
+            <Animated.View style={[styles.buttonAnimatedContainer, animatedLevelsBtnStyle]}>
+              <TouchableOpacity
+                activeOpacity={0.92}
+                onPressIn={handleLevelsPressIn}
+                onPressOut={handleLevelsPressOut}
+                onPress={handleLevelsPress}
+                style={styles.secondaryButtonWrapper}
+                accessibilityLabel="Select Level"
               >
-                <View style={styles.btnIconLeft}>
-                  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                    <Rect x="3" y="3" width="7" height="7" rx="1.8" fill="#FFFFFF" />
-                    <Rect x="14" y="3" width="7" height="7" rx="1.8" fill="#FFFFFF" />
-                    <Rect x="3" y="14" width="7" height="7" rx="1.8" fill="#FFFFFF" />
-                    <Rect x="14" y="14" width="7" height="7" rx="1.8" fill="#FFFFFF" />
-                  </Svg>
-                </View>
-                <Text style={styles.secondaryButtonText}>Levels</Text>
-                <View style={styles.btnIconRight}>
-                  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                    <Path
-                      d="M9 18l6-6-6-6"
-                      stroke="#8FA6CC"
-                      strokeWidth={2.4}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </Svg>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* 3. SETTINGS BUTTON (Glossy Metallic Dark Blue with Cyan Border) */}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handleSettingsPress}
-              style={styles.secondaryButtonWrapper}
-              accessibilityLabel="Settings"
-            >
-              <LinearGradient
-                colors={['#0C2556', '#081A40', '#040D24']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={styles.secondaryButtonGradient}
-              >
-                <View style={styles.btnIconLeft}>
-                  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                    <Circle cx="12" cy="12" r="3" stroke="#FFFFFF" strokeWidth={2} />
-                    <Path
-                      d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"
-                      stroke="#FFFFFF"
-                      strokeWidth={1.8}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </Svg>
-                </View>
-                <Text style={styles.secondaryButtonText}>Settings</Text>
-                <View style={styles.btnIconRight}>
-                  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                    <Path
-                      d="M9 18l6-6-6-6"
-                      stroke="#8FA6CC"
-                      strokeWidth={2.4}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </Svg>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={['#0C2556', '#081A40', '#040D24']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={styles.secondaryButtonGradient}
+                >
+                  <View style={styles.btnIconLeft}>
+                    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                      <Rect x="3" y="3" width="7" height="7" rx="1.8" fill="#FFFFFF" />
+                      <Rect x="14" y="3" width="7" height="7" rx="1.8" fill="#FFFFFF" />
+                      <Rect x="3" y="14" width="7" height="7" rx="1.8" fill="#FFFFFF" />
+                      <Rect x="14" y="14" width="7" height="7" rx="1.8" fill="#FFFFFF" />
+                    </Svg>
+                  </View>
+                  <Text style={styles.secondaryButtonText}>Levels</Text>
+                  <View style={styles.btnIconRight}>
+                    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                      <Path
+                        d="M9 18l6-6-6-6"
+                        stroke="#8FA6CC"
+                        strokeWidth={2.4}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </Svg>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
           </View>
 
           {/* ============================================================== */}
@@ -389,7 +370,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   topBar: {
     width: '100%',
@@ -452,17 +433,14 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
-  logoTextMazeMask: {
+  logoTextMaze: {
     fontFamily: typography.fontFamily.extraBold,
     fontSize: 38,
-    color: '#000000',
+    color: '#00F0FF',
     letterSpacing: -0.5,
-  },
-  logoTextMazePlaceholder: {
-    fontFamily: typography.fontFamily.extraBold,
-    fontSize: 38,
-    color: 'transparent',
-    letterSpacing: -0.5,
+    textShadowColor: 'rgba(0, 240, 255, 0.85)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 14,
   },
   tagline: {
     fontFamily: typography.fontFamily.regular,
@@ -482,8 +460,11 @@ const styles = StyleSheet.create({
   },
   buttonsStack: {
     width: '100%',
-    gap: 13,
+    gap: 16,
     alignItems: 'center',
+  },
+  buttonAnimatedContainer: {
+    width: '100%',
   },
   primaryButtonWrapper: {
     width: '100%',

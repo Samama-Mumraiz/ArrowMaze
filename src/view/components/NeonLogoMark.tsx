@@ -7,11 +7,7 @@ import Svg, {
   Path,
   Polygon,
 } from 'react-native-svg';
-import MaskedView from '@react-native-masked-view/masked-view';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
-
-const MaskedViewComponent = MaskedView as unknown as React.ComponentType<any>;
 
 interface NeonLogoMarkProps {
   size?: 'normal' | 'large';
@@ -80,27 +76,10 @@ export default function NeonLogoMark({
         </Svg>
       </View>
 
-      {/* 2. Exact "ArrowMaze" logo: "Arrow" in white, "Maze" in cyan->blue gradient (#22D3FF -> #2E7BFF) with MaskedView */}
+      {/* 2. Exact "ArrowMaze" logo: "Arrow" in white, "Maze" in glowing neon cyan (#00F0FF) */}
       <View style={styles.titleRow}>
         <Text style={[styles.logoTextArrow, { fontSize }]}>Arrow</Text>
-
-        <MaskedViewComponent
-          maskElement={
-            <Text style={[styles.logoTextMazeMask, { fontSize }]}>
-              Maze
-            </Text>
-          }
-        >
-          <LinearGradient
-            colors={['#22D3FF', '#2E7BFF']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={[styles.logoTextMazePlaceholder, { fontSize }]}>
-              Maze
-            </Text>
-          </LinearGradient>
-        </MaskedViewComponent>
+        <Text style={[styles.logoTextMaze, { fontSize }]}>Maze</Text>
       </View>
 
       {/* 3. Subtitle / Tagline in Sora_600SemiBold */}
@@ -141,16 +120,13 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 10,
   },
-  logoTextMazeMask: {
+  logoTextMaze: {
     fontFamily: 'Sora_800ExtraBold',
-    color: '#000000',
-    backgroundColor: 'transparent',
+    color: '#00F0FF',
     letterSpacing: -0.5,
-  },
-  logoTextMazePlaceholder: {
-    fontFamily: 'Sora_800ExtraBold',
-    opacity: 0,
-    letterSpacing: -0.5,
+    textShadowColor: 'rgba(0, 240, 255, 0.85)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 12,
   },
   taglineText: {
     fontFamily: 'Sora_600SemiBold',
