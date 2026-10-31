@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef, useCallback } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Svg, { Path, Polygon } from 'react-native-svg';
 import Animated, {
   useSharedValue,
@@ -13,8 +13,11 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Direction, GridCoord, Point2D, TangledStrand } from '../../model/types';
-import { getArrowheadPoints } from '../../utils/arrowGeometry';
-import { useTheme } from '../../theme/ThemeContext';
+import {
+  translateOrthogonalNodesToSvgPath,
+  getProportionalArrowheadPoints,
+} from '../../utils/arrowGeometry';
+import { FLAT_TECH_PALETTE, useTheme } from '../../theme/ThemeContext';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -58,7 +61,6 @@ function ArrowComponent({
   const direction = (strand?.direction || propDirection || 'R') as Direction;
   const dirUpper = (direction || 'R').toUpperCase();
 
-  // Stable callback ref so effect dependencies do not trigger re-renders
   const onExitCompleteRef = useRef(onExitComplete);
   onExitCompleteRef.current = onExitComplete;
 
@@ -90,13 +92,11 @@ function ArrowComponent({
     });
   }, [rawPath]);
 
-
-  // testong commit this one is 
   // Convert grid coordinates to pixel track centered at (cellSize / 2)
   const pixelCoords = useMemo(() => {
     return gridPoints.map((pt) => ({
-      x: pt.x * cellSize + cellSize / 2,
-      y: pt.y * cellSize + cellSize / 2,
+      x: +(pt.x * cellSize + cellSize / 2).toFixed(2),
+      y: +(pt.y * cellSize + cellSize / 2).toFixed(2),
     }));
   }, [gridPoints, cellSize]);
 
@@ -108,7 +108,7 @@ function ArrowComponent({
     return { x: 0, y: 0 };
   }, [pixelCoords]);
 
-  // 2. Build full extended path for true snake-like slithering
+  // 2. Dynamic Path Translation with Standard SVG Absolute Tracking (M, H, V)
   const exitDistance = Math.max(boardWidth || boardDimension, boardHeight || boardDimension) + 240;
 
   const { fullPathD, origLength, totalLength } = useMemo(() => {
@@ -116,13 +116,13 @@ function ArrowComponent({
       return { fullPathD: '', origLength: 1, totalLength: 1 };
     }
 
-    let d = `M ${pixelCoords[0].x} ${pixelCoords[0].y}`;
-    let origLen = 0;
+    // Dynamic translation using M, H, V
+    const baseD = translateOrthogonalNodesToSvgPath(gridPoints, cellSize);
 
+    let origLen = 0;
     for (let i = 1; i < pixelCoords.length; i++) {
       const p0 = pixelCoords[i - 1];
       const p1 = pixelCoords[i];
-      d += ` L ${p1.x} ${p1.y}`;
       origLen += Math.hypot(p1.x - p0.x, p1.y - p0.y);
     }
 
@@ -139,7 +139,17 @@ function ArrowComponent({
       extraY -= exitDistance;
     }
 
-    const fullD = `${d} L ${extraX} ${extraY}`;
+    // Append exit vector with H or V
+    let exitCmd = '';
+    if (extraY === lastCoord.y && extraX !== lastCoord.x) {
+      exitCmd = ` H ${extraX}`;
+    } else if (extraX === lastCoord.x && extraY !== lastCoord.y) {
+      exitCmd = ` V ${extraY}`;
+    } else {
+      exitCmd = ` L ${extraX} ${extraY}`;
+    }
+
+    const fullD = `${baseD}${exitCmd}`;
     const totLen = origLen + exitDistance;
 
     return {
@@ -147,14 +157,15 @@ function ArrowComponent({
       origLength: Math.max(1, origLen),
       totalLength: Math.max(1, totLen),
     };
-  }, [pixelCoords, lastCoord, dirUpper, exitDistance]);
+  }, [pixelCoords, gridPoints, cellSize, lastCoord, dirUpper, exitDistance]);
 
-  // Arrowhead polygon vertices (sleek, small neon arrowhead)
+  // Proportional Arrowhead Polygon Vertices (scaled for 4px-5px slim stroke)
   const arrowheadPoints = useMemo(() => {
-    // Drastically reduced size: small, sleek, and perfectly aligned with the line end
-    const headLength = Math.max(6.5, Math.min(10, cellSize * 0.24));
-    const headHalfWidth = Math.max(3.8, Math.min(6, cellSize * 0.15));
-    return getArrowheadPoints(
+    const scaleFactor = Math.min(1.2, Math.max(0.7, cellSize / 40));
+    const headLength = 7.5 * scaleFactor;
+    const headHalfWidth = 4.0 * scaleFactor;
+
+    return getProportionalArrowheadPoints(
       lastCoord.x,
       lastCoord.y,
       dirUpper,
@@ -163,12 +174,12 @@ function ArrowComponent({
     );
   }, [lastCoord, dirUpper, cellSize]);
 
-  // Reanimated Shared Values
+  // Reanimated Shared Values for Interactive State Layer
   const slitherOffset = useSharedValue(0);
   const blockedShake = useSharedValue(0);
   const hintPulse = useSharedValue(1);
 
-  // 3. Smooth Slithering Animation (750ms with inOut ease)
+  // Smooth Slithering Animation (750ms with inOut ease)
   useEffect(() => {
     if (isExiting) {
       slitherOffset.value = withTiming(
@@ -193,9 +204,9 @@ function ArrowComponent({
   useEffect(() => {
     if (isBlocked) {
       blockedShake.value = withSequence(
-        withTiming(6, { duration: 35 }),
-        withTiming(-6, { duration: 35 }),
-        withTiming(3, { duration: 35 }),
+        withTiming(5, { duration: 35 }),
+        withTiming(-5, { duration: 35 }),
+        withTiming(2, { duration: 35 }),
         withSpring(0, { damping: 10, stiffness: 250 })
       );
     }
@@ -206,7 +217,7 @@ function ArrowComponent({
     if (isHinted) {
       hintPulse.value = withRepeat(
         withSequence(
-          withTiming(1.08, { duration: 380 }),
+          withTiming(1.06, { duration: 380 }),
           withTiming(1.0, { duration: 380 })
         ),
         -1,
@@ -273,33 +284,25 @@ function ArrowComponent({
     };
   });
 
-  // 4. Color Logic: Neon Cyan (`#00F0FF`) & Neon Magenta (`#FF2A85`)
-  // As requested in prompt: "Arrows MUST be rendered as thick, continuous glowing neon lines (Cyan and Magenta)."
-  const isMagentaStrand = useMemo(() => {
-    if (strand?.color === '#FF2A85' || strand?.color?.includes('pink') || strand?.color?.includes('magenta')) {
-      return true;
+  // Flat Vector Tech Color Palette Mapping
+  const resolvedColor = useMemo(() => {
+    if (strand?.color && FLAT_TECH_PALETTE.includes(strand.color)) {
+      return strand.color;
     }
-    // Check if designated as accent strand (e.g. strand with index 1 or specific id)
-    if (strand?.id === 'strand-accent' || strand?.id?.includes('magenta') || strand?.id?.endsWith('-2')) {
-      return true;
+    if (strand?.colorIndex !== undefined && strand.colorIndex >= 0) {
+      return FLAT_TECH_PALETTE[strand.colorIndex % FLAT_TECH_PALETTE.length];
     }
-    return false;
+    return FLAT_TECH_PALETTE[0];
   }, [strand]);
 
-  const baseStroke = isMagentaStrand ? '#FF2A85' : '#00F0FF';
-  const baseGlow = isMagentaStrand ? 'rgba(255, 42, 133, 0.45)' : 'rgba(0, 240, 255, 0.45)';
-
-  const blockedColor = '#FF3366';
-  const blockedGlow = 'rgba(255, 51, 102, 0.5)';
+  const blockedColor = '#E52323';
   const hintColor = '#FFD700';
-  const hintGlow = 'rgba(255, 215, 0, 0.55)';
 
-  const bodyColor = isBlocked ? blockedColor : isHinted ? hintColor : baseStroke;
-  const glowColor = isBlocked ? blockedGlow : isHinted ? hintGlow : baseGlow;
+  const bodyColor = isBlocked ? blockedColor : isHinted ? hintColor : resolvedColor;
 
-  // Sleek continuous neon stroke
-  const coreStrokeWidth = Math.max(4.2, Math.min(6, cellSize * 0.17));
-  const outerGlowStrokeWidth = coreStrokeWidth + 4;
+  // Proportional stroke-width: restricted to 4px - 5px max on 40px grid
+  const scale = cellSize / 40;
+  const coreStrokeWidth = Math.max(3.8, Math.min(5.0, 4.2 * scale));
 
   const svgWidth = boardWidth || boardDimension;
   const svgHeight = boardHeight || boardDimension;
@@ -327,20 +330,9 @@ function ArrowComponent({
         }}
         pointerEvents="none"
       >
-        {/* Layer 1: Outer Neon Glow Track */}
+        {/* Uniform monoline stroke with strict round caps and round joins */}
         <AnimatedPath
-          d={fullPathD}
-          fill="none"
-          stroke={glowColor}
-          strokeWidth={outerGlowStrokeWidth}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeDasharray={[origLength, totalLength * 2]}
-          animatedProps={animatedPathProps}
-        />
-
-        {/* Layer 2: Core Vibrant Neon Line */}
-        <AnimatedPath
+          id={`path-${id}`}
           d={fullPathD}
           fill="none"
           stroke={bodyColor}
@@ -350,22 +342,9 @@ function ArrowComponent({
           strokeDasharray={[origLength, totalLength * 2]}
           animatedProps={animatedPathProps}
         />
-
-        {/* Layer 3: High-Tech White Center Highlight */}
-        <AnimatedPath
-          d={fullPathD}
-          fill="none"
-          stroke="#FFFFFF"
-          strokeWidth={coreStrokeWidth * 0.35}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeOpacity={0.65}
-          strokeDasharray={[origLength, totalLength * 2]}
-          animatedProps={animatedPathProps}
-        />
       </Svg>
 
-      {/* Synchronized Glowing Arrowhead at front of slithering snake */}
+      {/* Proportional Arrowhead aligned with the slim monoline stroke */}
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
@@ -378,23 +357,22 @@ function ArrowComponent({
           width={svgWidth}
           height={svgHeight}
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible' }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: svgWidth,
+            height: svgHeight,
+            overflow: 'visible',
+          }}
           pointerEvents="none"
         >
-          {/* Arrowhead Outer Glow */}
           <Polygon
+            id={`head-${id}`}
             points={arrowheadPoints}
             fill={bodyColor}
-            stroke={glowColor}
-            strokeWidth={2.5}
-            strokeLinejoin="round"
-          />
-          {/* Arrowhead Core */}
-          <Polygon
-            points={arrowheadPoints}
-            fill={bodyColor}
-            stroke="#FFFFFF"
-            strokeWidth={1}
+            stroke={bodyColor}
+            strokeWidth={0.5}
             strokeLinejoin="round"
           />
         </Svg>
@@ -403,5 +381,4 @@ function ArrowComponent({
   );
 }
 
-const Arrow = React.memo(ArrowComponent);
-export default Arrow;
+export default React.memo(ArrowComponent);

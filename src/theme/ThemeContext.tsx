@@ -93,6 +93,18 @@ export const ARROWMAZE_PALETTE = {
   white: '#FFFFFF',
 };
 
+// Flat Vector Tech Color Palette (Orthogonal High-Contrast Palette)
+export const FLAT_TECH_PALETTE = [
+  '#D92693', // Magenta
+  '#2D72F1', // Electric Blue
+  '#8C32E6', // Deep Purple
+  '#009BB4', // Teal/Cyan
+  '#E52323', // Vibrant Red
+  '#51A825', // Lime Green
+  '#E59018', // Bright Orange
+  '#1A1A1A', // Charcoal Accent
+];
+
 export const DARK_THEME: AppTheme = {
   mode: 'dark',
   name: 'Neon Cyberpunk Dark',
