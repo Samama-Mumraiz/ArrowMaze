@@ -1,36 +1,72 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
+  useWindowDimensions,
   ImageBackground,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withSpring,
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { typography } from '../theme/typography';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const LOADING_BG = require('../../assets/loading_bg.jpg');
 
+// Original background image dimensions (1696x2528)
+const BG_ORIGINAL_WIDTH = 1696;
+const BG_ORIGINAL_HEIGHT = 2528;
+
 export default function SplashScreen(): React.JSX.Element {
   const navigation = useNavigation<any>();
-  const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const progress = useSharedValue(0);
-  const buttonScale = useSharedValue(1);
   const hasNavigated = useRef(false);
+
+  // Mathematically map bounding boxes from the 1696x2528 background to current screen
+  const layout = useMemo(() => {
+    const imageAspect = BG_ORIGINAL_WIDTH / BG_ORIGINAL_HEIGHT;
+    const screenAspect = windowWidth / windowHeight;
+
+    let renderedW: number;
+    let renderedH: number;
+    let offsetX: number;
+    let offsetY: number;
+
+    if (screenAspect < imageAspect) {
+      // Taller screen (portrait phones): height fits, width is cropped symmetrically
+      renderedH = windowHeight;
+      renderedW = windowHeight * imageAspect;
+      offsetX = (windowWidth - renderedW) / 2;
+      offsetY = 0;
+    } else {
+      // Wider screen: width fits, height is cropped symmetrically
+      renderedW = windowWidth;
+      renderedH = windowWidth / imageAspect;
+      offsetX = 0;
+      offsetY = (windowHeight - renderedH) / 2;
+    }
+
+    const mapRect = (x: number, y: number, w: number, h: number) => ({
+      left: offsetX + (x / BG_ORIGINAL_WIDTH) * renderedW,
+      top: offsetY + (y / BG_ORIGINAL_HEIGHT) * renderedH,
+      width: (w / BG_ORIGINAL_WIDTH) * renderedW,
+      height: (h / BG_ORIGINAL_HEIGHT) * renderedH,
+    });
+
+    return {
+      // Inner fill channel of the progress bar track drawn on the image: X=[302, 1394], Y=[1880, 1964]
+      progressRect: mapRect(302, 1880, 1092, 84),
+      // "Tap to Skip" button graphic drawn on the image: X=[420, 1250], Y=[2200, 2410]
+      skipRect: mapRect(420, 2200, 830, 210),
+    };
+  }, [windowWidth, windowHeight]);
 
   const routeToHome = useCallback(
     (unconditional: boolean = false) => {
@@ -69,7 +105,7 @@ export default function SplashScreen(): React.JSX.Element {
   );
 
   useEffect(() => {
-    // Safety fallback timer: guarantees screen unconditionally proceeds even if animation or rehydration halts
+    // Safety fallback timer: guarantees screen unconditionally proceeds after 2.8s
     const fallbackTimer = setTimeout(() => {
       routeToHome(false);
     }, 2800);
@@ -98,22 +134,6 @@ export default function SplashScreen(): React.JSX.Element {
     width: `${Math.max(progress.value * 100, 4)}%`,
   }));
 
-  // "TAP TO SKIP" Button Spring Press Feedback
-  const animatedButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: buttonScale.value }],
-  }));
-
-  const handleSkipPressIn = () => {
-    buttonScale.value = withTiming(0.93, {
-      duration: 80,
-      easing: Easing.out(Easing.ease),
-    });
-  };
-
-  const handleSkipPressOut = () => {
-    buttonScale.value = withSpring(1, { damping: 12, stiffness: 240 });
-  };
-
   const handleSkipPress = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -131,65 +151,34 @@ export default function SplashScreen(): React.JSX.Element {
       style={styles.container}
     >
       {/* ============================================================== */}
-      {/* INTERACTIVE BOTTOM UI: Thick Blue Loading Bar + Skip Button    */}
-      {/* Positioned cleanly over the designated bottom area of the asset*/}
+      {/* 1. DYNAMIC PROGRESS FILL OVER PRE-DRAWN TRACK                  */}
+      {/* Only native animated fill rendered; outer track is in image    */}
       {/* ============================================================== */}
-      <View
-        style={[
-          styles.bottomSection,
-          { bottom: Math.max(28, insets.bottom + 16) },
-        ]}
-      >
-        {/* 1. Thick Blue Progress Bar with Glowing Yellow Fill */}
-        <View style={styles.progressBarWrapper}>
-          <View style={styles.progressBarTrack}>
-            <Animated.View style={[styles.progressBarFill, animatedProgressStyle]}>
-              <LinearGradient
-                colors={['#FFF9A6', '#FDE047', '#F59E0B', '#D97706']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={StyleSheet.absoluteFill}
-              />
-              {/* Top Gloss Reflection Streak */}
-              <View style={styles.progressGlossHighlight} />
-              {/* Leading Edge Bright Energy Tip */}
-              <View style={styles.progressLeadingGlow} />
-            </Animated.View>
-          </View>
-        </View>
-
-        {/* 2. "Loading..." Cartoon Typography */}
-        <Text style={styles.loadingText}>Loading...</Text>
-
-        {/* 3. Interactive Glossy 3D Blue "TAP TO SKIP" Pill Button */}
-        <Animated.View style={[styles.skipButtonWrapper, animatedButtonStyle]}>
-          <TouchableOpacity
-            activeOpacity={0.92}
-            onPressIn={handleSkipPressIn}
-            onPressOut={handleSkipPressOut}
-            onPress={handleSkipPress}
-            style={styles.skip3DBase}
-            accessibilityLabel="Tap to Skip Loading"
-          >
-            {/* 3D Dark Under-Bevel Base */}
-            <View style={styles.skipBevelBottom} />
-
-            {/* Glossy Cyan/Blue Front Face */}
-            <LinearGradient
-              colors={['#38BDF8', '#0284C7', '#0369A1']}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={styles.skipFrontFace}
-            >
-              {/* Top Gloss Reflection Highlight */}
-              <View style={styles.skipGlossHighlight} />
-
-              {/* Centered Button Text */}
-              <Text style={styles.skipButtonText}>TAP TO SKIP</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+      <View style={[styles.progressTrackOverlay, layout.progressRect]}>
+        <Animated.View style={[styles.progressBarFill, animatedProgressStyle]}>
+          <LinearGradient
+            colors={['#FFF9A6', '#FDE047', '#F59E0B', '#D97706']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* Top Gloss Reflection Streak */}
+          <View style={styles.progressGlossHighlight} />
+          {/* Leading Edge Bright Energy Tip */}
+          <View style={styles.progressLeadingGlow} />
         </Animated.View>
       </View>
+
+      {/* ============================================================== */}
+      {/* 2. TRANSPARENT HIT-ZONE OVER PRE-DRAWN "TAP TO SKIP" GRAPHIC   */}
+      {/* Zero duplicate text, zero duplicate backgrounds/borders        */}
+      {/* ============================================================== */}
+      <TouchableOpacity
+        activeOpacity={0.65}
+        onPress={handleSkipPress}
+        style={[styles.transparentSkipHitZone, layout.skipRect]}
+        accessibilityLabel="Tap to Skip Loading"
+      />
     </ImageBackground>
   );
 }
@@ -200,42 +189,18 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  bottomSection: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-    paddingHorizontal: 20,
-  },
 
-  /* 3D Glossy Rounded Loading Bar */
-  progressBarWrapper: {
-    width: '100%',
-    maxWidth: 300,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  progressBarTrack: {
-    width: '100%',
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#071F48',
-    borderWidth: 2.8,
-    borderColor: '#0284C7',
-    borderTopColor: '#38BDF8',
+  /* Dynamic Progress Fill Channel */
+  progressTrackOverlay: {
+    position: 'absolute',
+    backgroundColor: 'transparent',
+    borderRadius: 20,
     overflow: 'hidden',
-    position: 'relative',
-    shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
-    elevation: 4,
+    zIndex: 20,
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 9,
+    borderRadius: 20,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -244,17 +209,17 @@ const styles = StyleSheet.create({
     top: 2,
     left: 4,
     right: 4,
-    height: 6,
-    borderRadius: 3,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: 'rgba(255, 255, 255, 0.75)',
   },
   progressLeadingGlow: {
     position: 'absolute',
     right: 2,
-    top: 3,
-    bottom: 3,
-    width: 12,
-    borderRadius: 6,
+    top: 2,
+    bottom: 2,
+    width: 10,
+    borderRadius: 5,
     backgroundColor: '#FFFFFF',
     opacity: 0.9,
     shadowColor: '#FFFFFF',
@@ -263,71 +228,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
 
-  /* "Loading..." Typography */
-  loadingText: {
-    fontFamily: typography.fontFamily.extraBold,
-    fontSize: 18,
-    color: '#0F356B',
-    marginTop: 10,
-    marginBottom: 14,
-    letterSpacing: 0.6,
-    textShadowColor: 'rgba(255, 255, 255, 0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
-  },
-
-  /* 3D Blue Glossy "TAP TO SKIP" Pill Button */
-  skipButtonWrapper: {
-    width: '100%',
-    maxWidth: 246,
-    alignItems: 'center',
-  },
-  skip3DBase: {
-    width: '100%',
-    height: 52,
-    position: 'relative',
-  },
-  skipBevelBottom: {
+  /* Transparent Hit-Zone over Pre-Drawn "Tap to Skip" Button */
+  transparentSkipHitZone: {
     position: 'absolute',
-    top: 5,
-    left: 0,
-    right: 0,
-    height: 48,
-    backgroundColor: '#013D75',
-    borderRadius: 26,
-  },
-  skipFrontFace: {
-    width: '100%',
-    height: 48,
-    borderRadius: 26,
-    borderWidth: 2,
-    borderColor: '#7DD3FC',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  skipGlossHighlight: {
-    position: 'absolute',
-    top: 2,
-    left: 14,
-    right: 14,
-    height: 18,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.32)',
-  },
-  skipButtonText: {
-    fontFamily: typography.fontFamily.extraBold,
-    fontSize: 18,
-    color: '#FFFFFF',
-    letterSpacing: 1.2,
-    textShadowColor: 'rgba(1, 61, 117, 0.75)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 3,
+    backgroundColor: 'transparent',
+    borderRadius: 28,
+    zIndex: 50,
   },
 });

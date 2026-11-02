@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
+  useWindowDimensions,
   ImageBackground,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,27 +17,22 @@ import Svg, {
   Rect,
   Circle,
   Polygon,
-  Line,
 } from 'react-native-svg';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  Easing,
-} from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { typography } from '../theme/typography';
 import { usePlayer } from '../store/PlayerContext';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 const HOME_BG = require('../../assets/home_bg.jpg');
+
+// Original background image dimensions (1696x2528)
+const BG_ORIGINAL_WIDTH = 1696;
+const BG_ORIGINAL_HEIGHT = 2528;
 
 export default function HomeScreen(): React.JSX.Element {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { stats, totalWins } = usePlayer();
 
   // Dynamic values connected to React Native global state
@@ -45,33 +40,44 @@ export default function HomeScreen(): React.JSX.Element {
   const winsProgress = stats?.totalWins ?? totalWins ?? 8;
   const coinBalance = stats?.coins ?? 195;
 
-  // Reanimated 3D button press micro-interactions
-  const playScale = useSharedValue(1);
-  const levelsScale = useSharedValue(1);
+  // Mathematically map bounding boxes from the 1696x2528 background to current screen
+  const layout = useMemo(() => {
+    const imageAspect = BG_ORIGINAL_WIDTH / BG_ORIGINAL_HEIGHT;
+    const screenAspect = windowWidth / windowHeight;
 
-  const animatedPlayStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: playScale.value }],
-  }));
+    let renderedW: number;
+    let renderedH: number;
+    let offsetX: number;
+    let offsetY: number;
 
-  const animatedLevelsStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: levelsScale.value }],
-  }));
+    if (screenAspect < imageAspect) {
+      // Taller screen (portrait phones): height fits, width is cropped symmetrically
+      renderedH = windowHeight;
+      renderedW = windowHeight * imageAspect;
+      offsetX = (windowWidth - renderedW) / 2;
+      offsetY = 0;
+    } else {
+      // Wider screen: width fits, height is cropped symmetrically
+      renderedW = windowWidth;
+      renderedH = windowWidth / imageAspect;
+      offsetX = 0;
+      offsetY = (windowHeight - renderedH) / 2;
+    }
 
-  const handlePlayPressIn = () => {
-    playScale.value = withTiming(0.93, { duration: 80, easing: Easing.out(Easing.ease) });
-  };
+    const mapRect = (x: number, y: number, w: number, h: number) => ({
+      left: offsetX + (x / BG_ORIGINAL_WIDTH) * renderedW,
+      top: offsetY + (y / BG_ORIGINAL_HEIGHT) * renderedH,
+      width: (w / BG_ORIGINAL_WIDTH) * renderedW,
+      height: (h / BG_ORIGINAL_HEIGHT) * renderedH,
+    });
 
-  const handlePlayPressOut = () => {
-    playScale.value = withSpring(1, { damping: 12, stiffness: 240 });
-  };
-
-  const handleLevelsPressIn = () => {
-    levelsScale.value = withTiming(0.93, { duration: 80, easing: Easing.out(Easing.ease) });
-  };
-
-  const handleLevelsPressOut = () => {
-    levelsScale.value = withSpring(1, { damping: 12, stiffness: 240 });
-  };
+    return {
+      // Play button on image: X=[455, 1245], Y=[1630, 1920]
+      playRect: mapRect(455, 1630, 790, 290),
+      // Levels button on image: X=[365, 1335], Y=[1980, 2240]
+      levelsRect: mapRect(365, 1980, 970, 260),
+    };
+  }, [windowWidth, windowHeight]);
 
   const handlePlayPress = () => {
     try {
@@ -107,18 +113,17 @@ export default function HomeScreen(): React.JSX.Element {
       style={styles.container}
     >
       {/* ============================================================== */}
-      {/* 1. HUD OVERLAY: Top-Left Level Badge + Top-Right Coin Pill     */}
-      {/* Absolute positioning cleanly on top of the image asset         */}
+      {/* 1. DYNAMIC TOP HUD (Settings, Level Badge, Coins)              */}
+      {/* Positioned at the very top of safe area, above pre-drawn logo   */}
       {/* ============================================================== */}
       <View
         style={[
           styles.topHudContainer,
-          { top: Math.max(16, insets.top + 8) },
+          { top: Math.max(10, insets.top + 4) },
         ]}
       >
         {/* Top-Left: Settings Icon + Level Progress Badge */}
         <View style={styles.leftHeaderGroup}>
-          {/* Settings Button */}
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={handleSettingsPress}
@@ -145,7 +150,7 @@ export default function HomeScreen(): React.JSX.Element {
           {/* Stylized 'Level X' Progress Badge with Golden Crown */}
           <View style={styles.levelBadge}>
             <View style={styles.crownContainer}>
-              <Svg width={24} height={24} viewBox="0 0 32 32" fill="none">
+              <Svg width={22} height={22} viewBox="0 0 32 32" fill="none">
                 <Defs>
                   <SvgLinearGradient id="crownGrad" x1="0" y1="0" x2="0" y2="1">
                     <Stop offset="0%" stopColor="#FFF275" />
@@ -179,7 +184,7 @@ export default function HomeScreen(): React.JSX.Element {
         {/* Top-Right: Gold Coin Pill */}
         <View style={styles.coinPillContainer}>
           <View style={styles.coinIconWrapper}>
-            <Svg width={24} height={24} viewBox="0 0 32 32" fill="none">
+            <Svg width={22} height={22} viewBox="0 0 32 32" fill="none">
               <Defs>
                 <SvgLinearGradient id="goldCoinMain" x1="0" y1="0" x2="1" y2="1">
                   <Stop offset="0%" stopColor="#FFF275" />
@@ -207,109 +212,23 @@ export default function HomeScreen(): React.JSX.Element {
       </View>
 
       {/* ============================================================== */}
-      {/* 2. INTERACTIVE BUTTONS: Symmetrical 3D "Play" and "Levels"     */}
-      {/* Positioned in the lower center with Reanimated spring effects  */}
+      {/* 2. TRANSPARENT INTERACTIVE HIT-ZONES FOR PRE-DRAWN BUTTONS     */}
+      {/* Exactly mapped over "Play" and "Levels" on the background image */}
+      {/* Zero duplicate text, zero duplicate backgrounds/gradients       */}
       {/* ============================================================== */}
-      <View
-        style={[
-          styles.buttonStack,
-          { bottom: Math.max(32, insets.bottom + 22) },
-        ]}
-      >
-        {/* 1. PLAY BUTTON (with Yellow Glow-Sparkle Accents on sides) */}
-        <Animated.View style={[styles.buttonWrapper, animatedPlayStyle]}>
-          {/* Left Glow-Sparkles */}
-          <View style={styles.sparkleSideLeft}>
-            <Svg width={22} height={34} viewBox="0 0 24 36" fill="none">
-              <Line x1="18" y1="8" x2="6" y2="4" stroke="#FDE047" strokeWidth="3" strokeLinecap="round" />
-              <Line x1="20" y1="18" x2="4" y2="18" stroke="#FDE047" strokeWidth="3.5" strokeLinecap="round" />
-              <Line x1="18" y1="28" x2="6" y2="32" stroke="#FDE047" strokeWidth="3" strokeLinecap="round" />
-            </Svg>
-          </View>
+      <TouchableOpacity
+        activeOpacity={0.65}
+        onPress={handlePlayPress}
+        style={[styles.transparentButtonHitZone, layout.playRect]}
+        accessibilityLabel="Play Game"
+      />
 
-          {/* 3D Button Body */}
-          <TouchableOpacity
-            activeOpacity={0.92}
-            onPressIn={handlePlayPressIn}
-            onPressOut={handlePlayPressOut}
-            onPress={handlePlayPress}
-            style={styles.button3DBase}
-            accessibilityLabel="Play Game"
-          >
-            {/* 3D Dark Under-Bevel Base */}
-            <View style={styles.buttonBevelBottom} />
-
-            {/* Glossy Front Gradient Face */}
-            <LinearGradient
-              colors={['#38BDF8', '#0284C7', '#0369A1']}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={styles.buttonFrontFace}
-            >
-              {/* Top Gloss Reflection Highlight */}
-              <View style={styles.glossHighlightTop} />
-
-              {/* Centered Content: ▶ Play */}
-              <View style={styles.buttonContentRow}>
-                <View style={styles.playIconBadge}>
-                  <Svg width={22} height={22} viewBox="0 0 28 28" fill="#FFFFFF">
-                    <Polygon points="7,4 23,14 7,24" />
-                  </Svg>
-                </View>
-                <Text style={styles.buttonText}>Play</Text>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          {/* Right Glow-Sparkles */}
-          <View style={styles.sparkleSideRight}>
-            <Svg width={22} height={34} viewBox="0 0 24 36" fill="none">
-              <Line x1="6" y1="8" x2="18" y2="4" stroke="#FDE047" strokeWidth="3" strokeLinecap="round" />
-              <Line x1="4" y1="18" x2="20" y2="18" stroke="#FDE047" strokeWidth="3.5" strokeLinecap="round" />
-              <Line x1="6" y1="28" x2="18" y2="32" stroke="#FDE047" strokeWidth="3" strokeLinecap="round" />
-            </Svg>
-          </View>
-        </Animated.View>
-
-        {/* 2. LEVELS BUTTON (Exact Same Dimensions & Symmetrical Styling) */}
-        <Animated.View style={[styles.buttonWrapper, animatedLevelsStyle]}>
-          <TouchableOpacity
-            activeOpacity={0.92}
-            onPressIn={handleLevelsPressIn}
-            onPressOut={handleLevelsPressOut}
-            onPress={handleLevelsPress}
-            style={styles.button3DBase}
-            accessibilityLabel="Select Level"
-          >
-            {/* 3D Dark Under-Bevel Base */}
-            <View style={styles.buttonBevelBottom} />
-
-            {/* Glossy Front Gradient Face */}
-            <LinearGradient
-              colors={['#38BDF8', '#0284C7', '#0369A1']}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={styles.buttonFrontFace}
-            >
-              {/* Top Gloss Reflection Highlight */}
-              <View style={styles.glossHighlightTop} />
-
-              {/* Centered Content: ⚃ Levels */}
-              <View style={styles.buttonContentRow}>
-                <View style={styles.levelsIconBadge}>
-                  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                    <Rect x="2.5" y="2.5" width="8" height="8" rx="2" fill="#FFFFFF" />
-                    <Rect x="13.5" y="2.5" width="8" height="8" rx="2" fill="#FFFFFF" />
-                    <Rect x="2.5" y="13.5" width="8" height="8" rx="2" fill="#FFFFFF" />
-                    <Rect x="13.5" y="13.5" width="8" height="8" rx="2" fill="#FFFFFF" />
-                  </Svg>
-                </View>
-                <Text style={styles.buttonText}>Levels</Text>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
+      <TouchableOpacity
+        activeOpacity={0.65}
+        onPress={handleLevelsPress}
+        style={[styles.transparentButtonHitZone, layout.levelsRect]}
+        accessibilityLabel="Select Level"
+      />
     </ImageBackground>
   );
 }
@@ -326,12 +245,12 @@ const styles = StyleSheet.create({
   /* ---------------------------------------------------------------------- */
   topHudContainer: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: 14,
+    right: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 20,
+    zIndex: 50,
   },
   leftHeaderGroup: {
     flexDirection: 'row',
@@ -339,16 +258,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   settingsButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: '#7DD3FC',
     shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.45,
-    shadowRadius: 5,
+    shadowRadius: 4,
     elevation: 4,
   },
   settingsGradient: {
@@ -361,23 +280,23 @@ const styles = StyleSheet.create({
   levelBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(8, 28, 68, 0.88)',
-    borderRadius: 20,
-    borderWidth: 1.8,
+    backgroundColor: 'rgba(8, 28, 68, 0.90)',
+    borderRadius: 18,
+    borderWidth: 1.5,
     borderColor: '#38BDF8',
     paddingLeft: 6,
-    paddingRight: 12,
-    paddingVertical: 3.5,
-    gap: 6,
+    paddingRight: 10,
+    paddingVertical: 3,
+    gap: 5,
     shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.45,
-    shadowRadius: 5,
+    shadowRadius: 4,
     elevation: 4,
   },
   crownContainer: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -387,69 +306,69 @@ const styles = StyleSheet.create({
   },
   levelBadgeTitle: {
     fontFamily: typography.fontFamily.extraBold,
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },
   levelProgressTrack: {
-    width: 52,
-    height: 12,
+    width: 48,
+    height: 10,
     backgroundColor: '#0F274E',
-    borderRadius: 6,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#1E40AF',
     overflow: 'hidden',
-    marginTop: 1.5,
+    marginTop: 1,
   },
   levelProgressFill: {
     width: '55%',
     height: '100%',
     backgroundColor: '#22C55E',
-    borderRadius: 5,
+    borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
   levelProgressText: {
     fontFamily: typography.fontFamily.bold,
-    fontSize: 8,
+    fontSize: 7.5,
     color: '#FFFFFF',
-    lineHeight: 11,
+    lineHeight: 10,
   },
 
   /* Coin Pill */
   coinPillContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(8, 28, 68, 0.88)',
-    borderRadius: 20,
-    borderWidth: 1.8,
+    backgroundColor: 'rgba(8, 28, 68, 0.90)',
+    borderRadius: 18,
+    borderWidth: 1.5,
     borderColor: '#38BDF8',
     paddingLeft: 5,
     paddingRight: 6,
-    paddingVertical: 3.5,
-    gap: 7,
+    paddingVertical: 3,
+    gap: 6,
     shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.45,
-    shadowRadius: 5,
+    shadowRadius: 4,
     elevation: 4,
   },
   coinIconWrapper: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   coinBalanceText: {
     fontFamily: typography.fontFamily.extraBold,
-    fontSize: 15,
+    fontSize: 14,
     color: '#FFFFFF',
     letterSpacing: 0.5,
   },
   coinAddButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     overflow: 'hidden',
   },
   coinAddGradient: {
@@ -458,108 +377,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   coinAddText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
     color: '#FFFFFF',
     marginTop: -2,
   },
 
   /* ---------------------------------------------------------------------- */
-  /* INTERACTIVE LOWER-CENTER BUTTON STACK                                  */
+  /* TRANSPARENT HIT-ZONES OVER BAKED-IN BUTTONS                            */
   /* ---------------------------------------------------------------------- */
-  buttonStack: {
+  transparentButtonHitZone: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 14,
-    zIndex: 20,
-  },
-  buttonWrapper: {
-    width: '100%',
-    maxWidth: 260,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  sparkleSideLeft: {
-    position: 'absolute',
-    left: -28,
-    top: 10,
-    zIndex: 2,
-  },
-  sparkleSideRight: {
-    position: 'absolute',
-    right: -28,
-    top: 10,
-    zIndex: 2,
-  },
-  button3DBase: {
-    width: '100%',
-    height: 56,
-    position: 'relative',
-  },
-  buttonBevelBottom: {
-    position: 'absolute',
-    top: 5,
-    left: 0,
-    right: 0,
-    height: 51,
-    backgroundColor: '#013D75',
+    backgroundColor: 'transparent',
     borderRadius: 28,
-  },
-  buttonFrontFace: {
-    width: '100%',
-    height: 51,
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: '#7DD3FC',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 7,
-    elevation: 5,
-  },
-  glossHighlightTop: {
-    position: 'absolute',
-    top: 2,
-    left: 18,
-    right: 18,
-    height: 18,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
-  },
-  buttonContentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  playIconBadge: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 2,
-  },
-  levelsIconBadge: {
-    width: 22,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonText: {
-    fontFamily: typography.fontFamily.extraBold,
-    fontSize: 22,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(1, 61, 117, 0.8)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 3,
+    zIndex: 40,
   },
 });
