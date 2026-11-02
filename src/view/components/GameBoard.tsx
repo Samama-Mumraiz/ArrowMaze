@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -63,6 +63,9 @@ export default function GameBoard({
 }: GameBoardProps): React.JSX.Element {
   const { theme } = useTheme();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
+  const cardRef = useRef<any>(null);
+  const cardPageOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Actual rendered pixel dimensions measured on layout
   const [layoutDims, setLayoutDims] = useState<{ width: number; height: number }>({
@@ -131,31 +134,64 @@ export default function GameBoard({
     return dots;
   }, [rows, cols, gridStepSize, resolvedDotColor]);
 
-  // High-precision touch handling mapped to normalized grid coordinates
+  // High-precision touch handling mapped to normalized grid coordinates with generous hitSlop
   const handleBoardTouch = useCallback(
     (e: GestureResponderEvent) => {
-      if (isAnimating || !onStrandPress) return;
-      const { locationX, locationY } = e.nativeEvent;
+      if (!onStrandPress) return;
+      if (isAnimating && exitingStrandIds.length > 0) return;
+
+      const { locationX, locationY, pageX, pageY } = e.nativeEvent;
       const activeWidth = layoutDims.width || maxContainerWidth;
-      const activeHeight = layoutDims.height || (activeWidth / (cols / rows));
+      const activeHeight = layoutDims.height || activeWidth / (cols / rows);
+
+      let touchX = locationX;
+      let touchY = locationY;
+
+      // When absolute page coordinates are available, normalize against measured container page offset
+      if (
+        pageX !== undefined &&
+        pageY !== undefined &&
+        cardPageOffset.current.x > 0 &&
+        cardPageOffset.current.y > 0
+      ) {
+        const relX = pageX - cardPageOffset.current.x;
+        const relY = pageY - cardPageOffset.current.y;
+        if (
+          relX >= -16 &&
+          relX <= activeWidth + 16 &&
+          relY >= -16 &&
+          relY <= activeHeight + 16
+        ) {
+          touchX = Math.max(0, Math.min(activeWidth, relX));
+          touchY = Math.max(0, Math.min(activeHeight, relY));
+        }
+      }
 
       if (
-        locationX < 0 ||
-        locationY < 0 ||
-        locationX > activeWidth ||
-        locationY > activeHeight
+        touchX < -16 ||
+        touchY < -16 ||
+        touchX > activeWidth + 16 ||
+        touchY > activeHeight + 16
       ) {
         return;
       }
 
-      // Convert touch position to grid cell (col, row)
-      const col = Math.floor((locationX / activeWidth) * cols);
-      const row = Math.floor((locationY / activeHeight) * rows);
+      // Convert touch position to grid cell (col, row) clamped to grid bounds
+      const col = Math.min(cols - 1, Math.max(0, Math.floor((touchX / activeWidth) * cols)));
+      const row = Math.min(rows - 1, Math.max(0, Math.floor((touchY / activeHeight) * rows)));
 
       const active = strands.filter((s) => !exitingStrandIds.includes(s.id));
       if (active.length === 0) return;
 
-      // 1. Direct hit on occupied cells
+      // 1. Direct hit on strand head (highest priority - where player is pointing)
+      const headMatches = active.filter((s) => s.head.r === row && s.head.c === col);
+      if (headMatches.length > 0) {
+        const unblockedHead = headMatches.find((s) => clearStrandIds.includes(s.id));
+        onStrandPress(unblockedHead ? unblockedHead.id : headMatches[0].id);
+        return;
+      }
+
+      // 2. Direct hit on occupied cells
       const exactMatches = active.filter((s) =>
         s.occupiedCells.some((c) => c.r === row && c.c === col)
       );
@@ -179,18 +215,30 @@ export default function GameBoard({
         return;
       }
 
-      // 2. Proximity check within 1.25 cells
+      // 3. Proximity hit detection with generous hitSlop (up to 1.5 grid cells radius)
       const cellPixelW = activeWidth / cols;
       const cellPixelH = activeHeight / rows;
       let closestStrand: TangledStrand | null = null;
-      let closestDist = 1.25;
+      let closestDist = 1.5;
 
       for (const s of active) {
+        // Prioritize distance to head
+        const headCenterX = s.head.c * cellPixelW + cellPixelW / 2;
+        const headCenterY = s.head.r * cellPixelH + cellPixelH / 2;
+        const distHead =
+          Math.hypot(headCenterX - touchX, headCenterY - touchY) /
+          Math.min(cellPixelW, cellPixelH);
+        if (distHead < closestDist) {
+          closestDist = distHead;
+          closestStrand = s;
+        }
+
+        // Check distance to occupied cells along body
         for (const cell of s.occupiedCells) {
           const cellCenterX = cell.c * cellPixelW + cellPixelW / 2;
           const cellCenterY = cell.r * cellPixelH + cellPixelH / 2;
           const dist =
-            Math.hypot(cellCenterX - locationX, cellCenterY - locationY) /
+            Math.hypot(cellCenterX - touchX, cellCenterY - touchY) /
             Math.min(cellPixelW, cellPixelH);
           if (dist < closestDist) {
             closestDist = dist;
@@ -205,13 +253,13 @@ export default function GameBoard({
     },
     [
       isAnimating,
+      exitingStrandIds,
       onStrandPress,
       layoutDims,
       maxContainerWidth,
       cols,
       rows,
       strands,
-      exitingStrandIds,
       clearStrandIds,
     ]
   );
@@ -221,6 +269,13 @@ export default function GameBoard({
     if (width > 0 && height > 0) {
       setLayoutDims({ width, height });
     }
+    cardRef.current?.measure(
+      (_x: number, _y: number, _w: number, _h: number, pageX: number, pageY: number) => {
+        if (pageX !== undefined && pageY !== undefined) {
+          cardPageOffset.current = { x: pageX, y: pageY };
+        }
+      }
+    );
   };
 
   const animatedBoardShakeStyle = useAnimatedStyle(() => {
@@ -242,6 +297,7 @@ export default function GameBoard({
       {/* RESPONSIVE CONTAINER WITH ASPECT RATIO & FLAT TECH CANVAS      */}
       {/* ============================================================== */}
       <View
+        ref={cardRef}
         style={[
           styles.responsiveCard,
           {
@@ -252,9 +308,13 @@ export default function GameBoard({
           },
           containerStyle,
         ]}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         onLayout={handleLayout}
         onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderTerminationRequest={() => false}
         onResponderRelease={handleBoardTouch}
+        onResponderTerminate={handleBoardTouch}
       >
         {/* ============================================================== */}
         {/* DYNAMIC SVG WITH VIEWBOX (cols * step, rows * step)            */}

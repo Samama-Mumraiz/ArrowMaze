@@ -32,27 +32,66 @@ export default function SplashScreen(): React.JSX.Element {
   const buttonScale = useSharedValue(1);
   const hasNavigated = useRef(false);
 
-  const handleNavigation = useCallback(() => {
-    if (hasNavigated.current) return;
-    hasNavigated.current = true;
-    navigation.navigate('Home');
-  }, [navigation]);
+  const routeToHome = useCallback(
+    (unconditional: boolean = false) => {
+      if (hasNavigated.current && !unconditional) return;
+      hasNavigated.current = true;
+
+      // 1. Primary: navigation.replace('Home')
+      try {
+        if (typeof navigation.replace === 'function') {
+          navigation.replace('Home');
+          return;
+        }
+      } catch {
+        // replace fallback
+      }
+
+      // 2. Secondary: navigation.navigate('Home')
+      try {
+        navigation.navigate('Home');
+        return;
+      } catch {
+        // navigate fallback
+      }
+
+      // 3. Fallback: navigation.reset
+      try {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        });
+      } catch (err) {
+        console.warn('Fallback navigation to Home failed:', err);
+      }
+    },
+    [navigation]
+  );
 
   useEffect(() => {
-    // Smooth loading progress animation (2.6s) with ease-in-out curve
+    // Safety fallback timer: guarantees screen unconditionally proceeds even if animation or rehydration halts
+    const fallbackTimer = setTimeout(() => {
+      routeToHome(false);
+    }, 2800);
+
+    // Smooth loading progress animation (2.4s) with ease-in-out curve
     progress.value = withTiming(
       1,
       {
-        duration: 2600,
+        duration: 2400,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1),
       },
       (finished) => {
         if (finished) {
-          runOnJS(handleNavigation)();
+          runOnJS(routeToHome)(false);
         }
       }
     );
-  }, [progress, handleNavigation]);
+
+    return () => {
+      clearTimeout(fallbackTimer);
+    };
+  }, [progress, routeToHome]);
 
   // Loading Bar Width Animation
   const animatedProgressStyle = useAnimatedStyle(() => ({
@@ -81,7 +120,8 @@ export default function SplashScreen(): React.JSX.Element {
     } catch {
       // Platform fallback
     }
-    handleNavigation();
+    // Unconditionally route the user to the Home screen
+    routeToHome(true);
   };
 
   return (

@@ -14,14 +14,23 @@ import { PlayerProvider } from './src/store/PlayerContext';
 import { AppNavigator } from './src/navigation';
 
 export default function App(): React.JSX.Element {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Sora_400Regular,
     Sora_600SemiBold,
     Sora_700Bold,
     Sora_800ExtraBold,
   });
 
-  if (!fontsLoaded) {
+  // Fallback timer: prevents app from hanging indefinitely on cold start if font loading stalls
+  const [fontTimeout, setFontTimeout] = React.useState(false);
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setFontTimeout(true);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!fontsLoaded && !fontError && !fontTimeout) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#22D3FF" />

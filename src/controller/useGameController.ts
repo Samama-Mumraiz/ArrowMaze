@@ -92,8 +92,26 @@ export function useGameController(
         clearTimeout(hintTimeoutRef.current);
       }
       const config = getLevelConfig(lvl);
-      setLevelConfig(config);
-      setActiveStrands(config.strands);
+      const clonedStrands: TangledStrand[] = config.strands.map((s) => ({
+        ...s,
+        status: 'idle' as const,
+        points: s.points.map((p) => ({ ...p })),
+        occupiedCells: s.occupiedCells.map((c) => ({ ...c })),
+        head: { ...s.head },
+        path: s.path ? s.path.map((pt) => ({ ...pt })) : undefined,
+      }));
+      setLevelConfig({
+        ...config,
+        strands: clonedStrands,
+      });
+      setActiveStrands(
+        clonedStrands.map((s) => ({
+          ...s,
+          points: s.points.map((p) => ({ ...p })),
+          occupiedCells: s.occupiedCells.map((c) => ({ ...c })),
+          head: { ...s.head },
+        }))
+      );
       totalStrands.current = config.strands.length;
       setExitingStrandIds([]);
       setBlockedStrandId(null);
@@ -170,6 +188,47 @@ export function useGameController(
     return null;
   }, [isAnimating, isPaused, gameStatus, activeStrands, exitingStrandIds, levelConfig, triggerHaptic]);
 
+  const onExitAnimationComplete = useCallback(
+    (strandId: string) => {
+      setExitingStrandIds((prev) => prev.filter((id) => id !== strandId));
+      setIsAnimating(false);
+
+      setActiveStrands((prev) => {
+        const cleared = prev.find((s) => s.id === strandId);
+        if (cleared) {
+          const clonedCleared: TangledStrand = {
+            ...cleared,
+            status: 'idle',
+            points: cleared.points.map((p) => ({ ...p })),
+            occupiedCells: cleared.occupiedCells.map((c) => ({ ...c })),
+            head: { ...cleared.head },
+            path: cleared.path ? cleared.path.map((pt) => ({ ...pt })) : undefined,
+          };
+          setMoveHistory((history) => [...history, clonedCleared]);
+        }
+
+        const nextRemaining = prev
+          .filter((s) => s.id !== strandId)
+          .map((s) => ({
+            ...s,
+            points: s.points.map((p) => ({ ...p })),
+            occupiedCells: s.occupiedCells.map((c) => ({ ...c })),
+            head: { ...s.head },
+            path: s.path ? s.path.map((pt) => ({ ...pt })) : undefined,
+          }));
+
+        if (nextRemaining.length === 0) {
+          triggerHaptic('win');
+          onWinCallback?.(wasPerfectLevel, totalStrands.current);
+          setGameStatus('won');
+        }
+
+        return nextRemaining;
+      });
+    },
+    [triggerHaptic, onWinCallback, wasPerfectLevel]
+  );
+
   const handleStrandPress = useCallback(
     (strandId: string) => {
       if (isPaused || gameStatus !== 'playing') {
@@ -207,8 +266,31 @@ export function useGameController(
       if (raycastResult.isClear) {
         // Path is unblocked! Trigger immediate smooth gliding exit
         setIsAnimating(true);
-        setExitingStrandIds((prev) => [...prev, strandId]);
+        setExitingStrandIds((prev) => (prev.includes(strandId) ? prev : [...prev, strandId]));
+        setActiveStrands((prev) =>
+          prev.map((s) =>
+            s.id === strandId
+              ? {
+                  ...s,
+                  status: 'moving' as const,
+                  points: s.points.map((p) => ({ ...p })),
+                  occupiedCells: s.occupiedCells.map((c) => ({ ...c })),
+                  head: { ...s.head },
+                }
+              : {
+                  ...s,
+                  points: s.points.map((p) => ({ ...p })),
+                  occupiedCells: s.occupiedCells.map((c) => ({ ...c })),
+                  head: { ...s.head },
+                }
+          )
+        );
         triggerHaptic('success');
+
+        // Safety fallback timer: prevents the game from ever getting stuck in animating state
+        setTimeout(() => {
+          onExitAnimationComplete(strandId);
+        }, 900);
       } else {
         // Path is blocked!
         setIsAnimating(true);
@@ -242,27 +324,21 @@ export function useGameController(
         }, 280);
       }
     },
-    [isPaused, isAnimating, gameStatus, exitingStrandIds, blockedStrandId, hintStrandId, activeStrands, levelConfig, screenShake, triggerHaptic, lives, onLossCallback]
-  );
-
-  const onExitAnimationComplete = useCallback(
-    (strandId: string) => {
-      const cleared = activeStrands.find((s) => s.id === strandId);
-      if (cleared) {
-        setMoveHistory((prev) => [...prev, cleared]);
-      }
-      const nextRemaining = activeStrands.filter((s) => s.id !== strandId);
-      setActiveStrands(nextRemaining);
-      setExitingStrandIds((prev) => prev.filter((id) => id !== strandId));
-      setIsAnimating(false);
-
-      if (nextRemaining.length === 0) {
-        triggerHaptic('win');
-        onWinCallback?.(wasPerfectLevel, totalStrands.current);
-        setGameStatus('won');
-      }
-    },
-    [triggerHaptic, onWinCallback, wasPerfectLevel, activeStrands]
+    [
+      isPaused,
+      isAnimating,
+      gameStatus,
+      exitingStrandIds,
+      blockedStrandId,
+      hintStrandId,
+      activeStrands,
+      levelConfig,
+      screenShake,
+      triggerHaptic,
+      lives,
+      onLossCallback,
+      onExitAnimationComplete,
+    ]
   );
 
   const undoMove = useCallback(() => {
@@ -271,7 +347,23 @@ export function useGameController(
     }
     const last = moveHistory[moveHistory.length - 1];
     setMoveHistory((prev) => prev.slice(0, prev.length - 1));
-    setActiveStrands((prev) => [...prev, { ...last, status: 'idle' }]);
+    const restoredStrand: TangledStrand = {
+      ...last,
+      status: 'idle' as const,
+      points: last.points.map((p) => ({ ...p })),
+      occupiedCells: last.occupiedCells.map((c) => ({ ...c })),
+      head: { ...last.head },
+      path: last.path ? last.path.map((pt) => ({ ...pt })) : undefined,
+    };
+    setActiveStrands((prev) => [
+      ...prev.map((s) => ({
+        ...s,
+        points: s.points.map((p) => ({ ...p })),
+        occupiedCells: s.occupiedCells.map((c) => ({ ...c })),
+        head: { ...s.head },
+      })),
+      restoredStrand,
+    ]);
     triggerHaptic('light');
   }, [moveHistory, isAnimating, isPaused, gameStatus, triggerHaptic]);
 

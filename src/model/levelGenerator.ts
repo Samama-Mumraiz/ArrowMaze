@@ -103,10 +103,17 @@ export function generateProceduralTangledLevel(
  */
 export function getLevelConfig(levelNumber: number): LevelConfig {
   const progressive = PROGRESSIVE_LEVELS.find((l) => l.levelNumber === levelNumber);
-  if (progressive) {
-    return progressive;
-  }
-  return generateProceduralTangledLevel(levelNumber);
+  const cfg = progressive || generateProceduralTangledLevel(levelNumber);
+  return {
+    ...cfg,
+    strands: cfg.strands.map((s) => ({
+      ...s,
+      points: s.points.map((p) => ({ ...p })),
+      occupiedCells: s.occupiedCells.map((c) => ({ ...c })),
+      path: s.path ? s.path.map((pt) => ({ ...pt })) : undefined,
+      head: { ...s.head },
+    })),
+  };
 }
 
 /* =========================================================================

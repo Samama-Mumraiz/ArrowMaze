@@ -65,10 +65,8 @@ function ArrowComponent({
   onExitCompleteRef.current = onExitComplete;
 
   const handleFinish = useCallback(
-    (finished?: boolean) => {
-      if (finished) {
-        onExitCompleteRef.current?.(id);
-      }
+    (_finished?: boolean) => {
+      onExitCompleteRef.current?.(id);
     },
     [id]
   );
@@ -280,7 +278,6 @@ function ArrowComponent({
     }
     return {
       transform: [{ translateX: sx }, { translateY: sy }, { scale: hintPulse.value }],
-      zIndex: isExiting ? 999 : isHinted ? 888 : 10,
     };
   });
 
@@ -311,8 +308,11 @@ function ArrowComponent({
     <Animated.View
       style={[
         StyleSheet.absoluteFill,
+        {
+          zIndex: isExiting ? 999 : isHinted ? 888 : 10,
+          overflow: 'visible',
+        },
         animatedContainerStyle,
-        { overflow: 'visible' },
       ]}
       pointerEvents="none"
     >
